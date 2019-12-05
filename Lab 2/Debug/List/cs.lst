@@ -1,0 +1,1336 @@
+###############################################################################
+#
+# IAR C/C++ Compiler V7.12.3.989/W32 for MSP430           14/Nov/2019  10:44:42
+# Copyright 1996-2019 IAR Systems AB.
+# PC-locked license - IAR Embedded Workbench for Texas Instruments MSP430, 8K KickStart Edition 7.12
+#
+#    __rt_version  =  3
+#    __double_size =  32
+#    __reg_r4      =  free
+#    __reg_r5      =  free
+#    __pic         =  no
+#    __core        =  430X
+#    __data_model  =  small
+#    __code_model  =  large
+#    Source file   =  H:\Year 3\EE312\driverlib\MSP430FR2xx_4xx\cs.c
+#    Command line  =  
+#        -f C:\Users\rjb17150\AppData\Local\Temp\EWC978.tmp ("H:\Year
+#        3\EE312\driverlib\MSP430FR2xx_4xx\cs.c" -lcN "H:\Year 3\EE312\Lab
+#        2\Debug\List" -o "H:\Year 3\EE312\Lab 2\Debug\Obj" --no_cse
+#        --no_unroll --no_inline --no_code_motion --no_tbaa --debug
+#        -D__MSP430FR4133__ -e --double=32 --dlib_config "C:\Program Files
+#        (x86)\IAR Systems\Embedded Workbench 8.0\430\lib\dlib\dl430xlsfn.h" -I
+#        "H:\Year 3\EE312\Lab 2\..\" -I "H:\Year 3\EE312\Lab
+#        2\..\driverlib\MSP430FR2xx_4xx\" --core=430X --data_model=small -Ol
+#        --hw_workaround=CPU40 --code_model=large)
+#    Locale        =  English_GBR.1252
+#    List file     =  H:\Year 3\EE312\Lab 2\Debug\List\cs.lst
+#    Object file   =  H:\Year 3\EE312\Lab 2\Debug\Obj\cs.r43
+#
+###############################################################################
+
+H:\Year 3\EE312\driverlib\MSP430FR2xx_4xx\cs.c
+      1          /* --COPYRIGHT--,BSD
+      2           * Copyright (c) 2017, Texas Instruments Incorporated
+      3           * All rights reserved.
+      4           *
+      5           * Redistribution and use in source and binary forms, with or without
+      6           * modification, are permitted provided that the following conditions
+      7           * are met:
+      8           *
+      9           * *  Redistributions of source code must retain the above copyright
+     10           *    notice, this list of conditions and the following disclaimer.
+     11           *
+     12           * *  Redistributions in binary form must reproduce the above copyright
+     13           *    notice, this list of conditions and the following disclaimer in the
+     14           *    documentation and/or other materials provided with the distribution.
+     15           *
+     16           * *  Neither the name of Texas Instruments Incorporated nor the names of
+     17           *    its contributors may be used to endorse or promote products derived
+     18           *    from this software without specific prior written permission.
+     19           *
+     20           * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+     21           * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+     22           * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+     23           * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+     24           * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+     25           * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+     26           * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+     27           * OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+     28           * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+     29           * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
+     30           * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+     31           * --/COPYRIGHT--*/
+     32          //*****************************************************************************
+     33          //
+     34          // cs.c - Driver for the cs Module.
+     35          //
+     36          //*****************************************************************************
+     37          
+     38          //*****************************************************************************
+     39          //
+     40          //! \addtogroup cs_api cs
+     41          //! @{
+     42          //
+     43          //*****************************************************************************
+     44          
+     45          #include "inc/hw_memmap.h"
+     46          
+     47          #ifdef __MSP430_HAS_CS__
+     48          #include "cs.h"
+     49          
+     50          #include <assert.h>
+     51          
+     52          //*****************************************************************************
+     53          //
+     54          // Internal very low power VLOCLK, low frequency oscillator with 10 kHz typical
+     55          // frequency
+     56          //
+     57          //*****************************************************************************
+     58          #define CS_VLOCLK_FREQUENCY                                               10000
+     59          
+     60          //*****************************************************************************
+     61          //
+     62          // Internal, trimmed, low-frequency oscillator with 32768 Hz typical frequency
+     63          //
+     64          //*****************************************************************************
+     65          #define CS_REFOCLK_FREQUENCY                                              32768
+     66          
+     67          //*****************************************************************************
+     68          //
+     69          // Internal DCO frequency range
+     70          //
+     71          //*****************************************************************************
+     72          #define CS_DCO_RANGE_1MHZ                                               1000000
+     73          #define CS_DCO_RANGE_2MHZ                                               2000000
+     74          #define CS_DCO_RANGE_4MHZ                                               4000000
+     75          #define CS_DCO_RANGE_8MHZ                                               8000000
+     76          #define CS_DCO_RANGE_12MHZ                                             12000000
+     77          #define CS_DCO_RANGE_16MHZ                                             16000000
+     78          #define CS_DCO_RANGE_20MHZ                                             20000000
+     79          #define CS_DCO_RANGE_24MHZ                                             24000000
+     80          
+     81          //******************************************************************************
+     82          //
+     83          //The XT1 crystal frequency. Should be set with CS_externalClockSourceInit
+     84          //if XT1 is used and user intends to invoke CS_getSMCLK, CS_getMCLK or
+     85          //CS_getACLK
+     86          //
+     87          //******************************************************************************
+     88          static uint32_t privateXT1ClockFrequency = 0;
+     89          
+     90          static uint32_t privateDCORange(void)
+     91          {
+     92              uint32_t res = 0;
+     93              switch ( (HWREG8(CS_BASE + OFS_CSCTL1)) & DCORSEL_7) {
+     94              case DCORSEL_0:
+     95                  res = CS_DCO_RANGE_1MHZ;
+     96                  break;
+     97              case DCORSEL_1:
+     98                  res = CS_DCO_RANGE_2MHZ;
+     99                  break;
+    100              case DCORSEL_2:
+    101                  res = CS_DCO_RANGE_4MHZ;
+    102                  break;
+    103              case DCORSEL_3:
+    104                  res = CS_DCO_RANGE_8MHZ;
+    105                  break;
+    106              case DCORSEL_4:
+    107                  res = CS_DCO_RANGE_12MHZ;
+    108                  break;
+    109              case DCORSEL_5:
+    110                  res = CS_DCO_RANGE_16MHZ;
+    111                  break;
+    112              case DCORSEL_6:
+    113                  res = CS_DCO_RANGE_20MHZ;
+    114                  break;
+    115              case DCORSEL_7:
+    116                  res = CS_DCO_RANGE_24MHZ;
+    117                  break;
+    118              default:
+    119                  break;
+    120              }
+    121          
+    122              return res;
+    123          }
+    124          
+    125          static uint32_t privateCSSourceClockFromDCO(uint16_t FLLRefCLKSource)
+    126          {
+    127              uint16_t N_value;
+    128              uint16_t n_value = 1;
+    129              uint32_t Fref_value = 1;
+    130          
+    131              N_value = (HWREG16(CS_BASE + OFS_CSCTL2)) & 0x03FF;
+    132              uint16_t tempDivider = HWREG8(CS_BASE + OFS_CSCTL3) & FLLREFDIV_7;
+    133          
+    134              if (tempDivider > 1) {
+    135                  n_value = 32 << (tempDivider-1);
+    136              }
+    137          
+    138              switch ( (HWREG8(CS_BASE + OFS_CSCTL3)) & SELREF_3 ) {
+    139                  case SELREF__XT1CLK:
+    140                      Fref_value = privateXT1ClockFrequency;
+    141          
+    142                      if (HWREG8(CS_BASE + OFS_CSCTL7) & XT1OFFG) {
+    143                          HWREG8(CS_BASE + OFS_CSCTL7) &= ~(XT1OFFG);
+    144                          //Clear OFIFG fault flag
+    145                          HWREG8(CS_BASE + OFS_SFRIFG1) &= ~OFIFG;
+    146          
+    147                          if (HWREG8(CS_BASE + OFS_CSCTL7) & XT1OFFG) {
+    148                              if (HWREG16(CS_BASE + OFS_CSCTL6) & XTS) {
+    149                                  HWREG8(CS_BASE + OFS_CSCTL7) &= ~DCOFFG;
+    150                                  Fref_value = privateDCORange();
+    151                              }   // XTS
+    152                              else {
+    153                                  Fref_value = CS_REFOCLK_FREQUENCY;
+    154                              }   // XTS
+    155                          }   // XT1OFFG #2
+    156                      }   // XT1OFFG #1
+    157                      break;
+    158                  case SELREF__REFOCLK:
+    159                      Fref_value = CS_REFOCLK_FREQUENCY;
+    160                      break;
+    161                  default: break;
+    162              }
+    163          
+    164              return (Fref_value * (N_value + 1) / n_value);
+    165          }
+    166          
+    167          static uint32_t privateCSComputeCLKFrequency(uint16_t CLKSource,
+    168              uint16_t CLKSourceDivider,
+    169              uint8_t CLKDest
+    170              )
+    171          {
+    172              uint32_t CLKFrequency = 0;
+    173              uint8_t CLKSourceFrequencyDivider = 1;
+    174          
+    175              CLKSourceFrequencyDivider = 1<<CLKSourceDivider;
+    176          
+    177              switch (CLKSource) {
+    178                  case SELMS__XT1CLK:
+    179                      CLKFrequency = (privateXT1ClockFrequency /
+    180                                      CLKSourceFrequencyDivider);
+    181          
+    182                        if (HWREG8(CS_BASE + OFS_CSCTL7) & XT1OFFG) {
+    183                          HWREG8(CS_BASE + OFS_CSCTL7) &= ~(XT1OFFG);
+    184                          //Clear OFIFG fault flag
+    185                          HWREG8(SFR_BASE + OFS_SFRIFG1) &= ~OFIFG;
+    186                          //fail-safe operation
+    187                          if (HWREG8(CS_BASE + OFS_CSCTL7) & XT1OFFG) {
+    188                              //fail-safe for ACLK or XT1 mode is LF
+    189                              if (CLKDest == CS_ACLK || (HWREG16(CS_BASE + OFS_CSCTL6) & XTS) == 0) {
+    190                                  CLKFrequency = CS_REFOCLK_FREQUENCY;
+    191                              }
+    192                              //XT1 mode is HF
+    193                              else {
+    194                                  HWREG8(CS_BASE + OFS_CSCTL7) &= ~DCOFFG;
+    195                                  CLKFrequency = privateDCORange();
+    196                              }
+    197                          }
+    198                      }
+    199                      break;
+    200          
+    201                  case SELMS__VLOCLK:
+    202                      CLKFrequency =
+    203                          (CS_VLOCLK_FREQUENCY / CLKSourceFrequencyDivider);
+    204                      break;
+    205                  case SELMS__REFOCLK:
+    206                      CLKFrequency =
+    207                          (CS_REFOCLK_FREQUENCY / CLKSourceFrequencyDivider);
+    208                      break;
+    209                  case SELMS__DCOCLKDIV:
+    210                      CLKFrequency =
+    211                              privateCSSourceClockFromDCO( CLKSource)
+    212                              / CLKSourceFrequencyDivider;
+    213                      break;
+    214              }
+    215              return ( CLKFrequency) ;
+    216          }
+    217          
+    218          static void privateCSComputeDCOFTrim(CS_initFLLParam *param)
+    219          {
+    220              uint16_t oldDcoTap = 0xffff;
+    221              uint16_t newDcoTap = 0xffff;
+    222              uint16_t newDcoDelta = 0xffff;
+    223              uint16_t bestDcoDelta = 0xffff;
+    224              uint16_t csCtl0Copy = 0;
+    225              uint16_t csCtl1Copy = 0;
+    226              uint16_t csCtl0Read = 0;
+    227              uint16_t csCtl1Read = 0;
+    228              uint16_t dcoFreqTrim = 3;
+    229              bool endLoop = false;
+    230              
+    231              do
+    232              {
+    233                  HWREG16(CS_BASE + OFS_CSCTL0) = DCO8;   // DCO Tap = 256
+    234                  do
+    235                  {
+    236                      HWREG16(CS_BASE + OFS_CSCTL7) &= ~DCOFFG;   // Clear DCO fault flag
+    237                  } while(HWREG16(CS_BASE + OFS_CSCTL7) & DCOFFG);
+    238                  
+    239                  switch((HWREG16(CS_BASE + OFS_CSCTL1) & DCORSEL_7) >> 1)
+    240                  {
+    241                  // Wait FLL lock status (FLLUNLOCK) stable
+    242                  // Suggest to wait 24 cycles of divided FLL refclk
+    243                      case 0: // 1 MHz
+    244                          __delay_cycles((uint16_t)3000);
+    245                          break;
+    246                      case 1: // 2 MHz
+    247                          __delay_cycles((uint16_t)3000 * 2);
+    248                          break;
+    249                      case 2: // 4 MHz
+    250                          __delay_cycles((uint16_t)3000 * 4);
+    251                          break;
+    252                      case 3: // 8 MHz
+    253                          __delay_cycles((uint16_t)3000 * 8);
+    254                          break;
+    255                      case 4: // 12 MHz
+    256                          __delay_cycles((uint16_t)3000 * 12);
+    257                          break;
+    258                      case 5: // 16 MHz
+    259                          __delay_cycles((uint16_t)3000 * 16);
+    260                          break;
+    261                      case 6: // 20 MHz
+    262                          __delay_cycles((uint16_t)3000 * 20);
+    263                          break;
+    264                      case 7: // 24 MHz
+    265                          __delay_cycles((uint32_t)3000 * 24);
+    266                          break;
+    267                      default:    // reserved
+    268                          __delay_cycles((uint16_t)3000 * 16);
+    269                          break;
+    270                  }
+    271                  
+    272                  // Poll the FLLUNLOCK bits and DCOFFG bit until FLL is locked or DCO fault
+    273                  while((HWREG16(CS_BASE + OFS_CSCTL7) & (FLLUNLOCK0 | FLLUNLOCK1)) &&
+    274                      ((HWREG16(CS_BASE + OFS_CSCTL7) & DCOFFG) == 0));
+    275                      
+    276                  csCtl0Read = HWREG16(CS_BASE + OFS_CSCTL0); // Read CSCTL0
+    277                  csCtl1Read = HWREG16(CS_BASE + OFS_CSCTL1); // Read CSCTL1
+    278                  
+    279                  oldDcoTap = newDcoTap;  // Record DCOTAP value of last time
+    280                  newDcoTap = csCtl0Read & 0x01ff;    // Get DCOTAP value of this time
+    281                  dcoFreqTrim = (csCtl1Read & 0x0070) >> 4;   // Get DCOFTRIM value
+    282                  
+    283                  if(newDcoTap < 256) // DCOTAP < 256
+    284                  {
+    285                      newDcoDelta = 256 - newDcoTap;  // Delta value between DCOTAP and 256
+    286                      if((oldDcoTap != 0xffff) && (oldDcoTap >= 256)) // DCOTAP cross 256
+    287                      {
+    288                          endLoop = true; // Stop while loop
+    289                      }
+    290                      else
+    291                      {
+    292                          dcoFreqTrim--;
+    293                          HWREG16(CS_BASE + OFS_CSCTL1) = (csCtl1Read & (~0x0070)) | (dcoFreqTrim << 4);
+    294                      }
+    295                  }
+    296                  else   // DCOTAP >= 256
+    297                  {
+    298                      newDcoDelta = newDcoTap - 256;  // Delta value between DCOTAP and 256
+    299                      if(oldDcoTap < 256) // DCOTAP cross 256
+    300                      {
+    301                          endLoop = true; // Stop while loop
+    302                      }
+    303                      else
+    304                      {
+    305                          dcoFreqTrim++;
+    306                          HWREG16(CS_BASE + OFS_CSCTL1) = (csCtl1Read & (~0x0070)) | (dcoFreqTrim << 4);
+    307                      }
+    308                  }
+    309              
+    310                  if(newDcoDelta < bestDcoDelta)  // Record DCOTAP closest to 256
+    311                  {
+    312                      csCtl0Copy = csCtl0Read;
+    313                      csCtl1Copy = csCtl1Read;
+    314                      bestDcoDelta = newDcoDelta;
+    315                  }
+    316              
+    317              } while(endLoop == false);  // Poll until endLoop == 1
+    318              
+    319              HWREG16(CS_BASE + OFS_CSCTL0) = csCtl0Copy; // Reload locked DCOTAP
+    320              HWREG16(CS_BASE + OFS_CSCTL1) = csCtl1Copy; // Reload locked DCOFTRIM
+    321              param->csCtl0 = csCtl0Copy;
+    322              param->csCtl1 = csCtl1Copy;
+    323              while(HWREG16(CS_BASE + OFS_CSCTL7) & (FLLUNLOCK0 | FLLUNLOCK1));   // Poll until FLL is locked
+    324          }
+    325          
+    326          void CS_setExternalClockSource(uint32_t XT1CLK_frequency
+    327              )
+    328          {
+    329              privateXT1ClockFrequency = XT1CLK_frequency;
+    330          }
+    331          
+    332          void CS_initClockSignal(uint8_t selectedClockSignal,
+    333              uint16_t clockSource,
+    334              uint16_t clockSourceDivider
+    335              )
+    336          {
+    337              uint16_t temp;
+    338              switch (selectedClockSignal) {
+    339                  case CS_ACLK:
+    340          
+    341                      HWREG16(CS_BASE + OFS_CSCTL4) &= ~(SELA);
+    342          
+    343                      if (clockSource == CS_XT1CLK_SELECT) {
+    344                          clockSource = 0x0;
+    345                      }
+    346                      else if (clockSource == CS_REFOCLK_SELECT) {
+    347                          clockSource = 0x1;
+    348                      }
+    349                      else if (clockSource == CS_VLOCLK_SELECT) {
+    350                          clockSource = 0x2;
+    351                      }
+    352                      clockSource = clockSource << 8;
+    353          
+    354                      HWREG16(CS_BASE + OFS_CSCTL4) |= (clockSource);
+    355          #ifdef DIVA0
+    356                      if (HWREG16(CS_BASE + OFS_CSCTL6) & XTS) {
+    357          
+    358                          temp = HWREG16(CS_BASE + OFS_CSCTL6);
+    359                          if (clockSourceDivider != CS_CLOCK_DIVIDER_1) {
+    360                              clockSourceDivider = (clockSourceDivider-3) << 8;
+    361                              HWREG16(CS_BASE + OFS_CSCTL6) |= temp & ~(DIVA3|DIVA2|DIVA1|DIVA0)
+    362                                                               | clockSourceDivider;
+    363                          }
+    364                      }
+    365          #endif
+    366                      break;
+    367                  case CS_SMCLK:
+    368          
+    369                      HWREG16(CS_BASE + OFS_CSCTL4) &= ~(SELMS_7);
+    370                      HWREG16(CS_BASE + OFS_CSCTL4) |= (clockSource);
+    371          
+    372                      temp = HWREG16(CS_BASE + OFS_CSCTL5);
+    373                      clockSourceDivider = clockSourceDivider << 4;
+    374                      HWREG16(CS_BASE + OFS_CSCTL5) = temp & ~(DIVS_3) | clockSourceDivider;
+    375                      break;
+    376                  case CS_MCLK:
+    377          
+    378                      HWREG16(CS_BASE + OFS_CSCTL4) &= ~(SELMS_7);
+    379                      HWREG16(CS_BASE + OFS_CSCTL4) |= (clockSource);
+    380          
+    381                      temp = HWREG16(CS_BASE + OFS_CSCTL5);
+    382                      HWREG16(CS_BASE + OFS_CSCTL5) = temp & ~(DIVM_7) | clockSourceDivider;
+    383                      break;
+    384                  case CS_FLLREF:
+    385          
+    386                      HWREG8(CS_BASE + OFS_CSCTL3) &=  ~(SELREF_3);
+    387          
+    388                      if (clockSource == CS_XT1CLK_SELECT) {
+    389                          clockSource = 0x0;
+    390                      }
+    391                      clockSource = clockSource << 4;
+    392                      HWREG8(CS_BASE + OFS_CSCTL3) |= (clockSource);
+    393          
+    394                      temp = HWREG8(CS_BASE + OFS_CSCTL3);
+    395                      //Note that dividers for FLLREF are slightly different
+    396                      //Hence handled differently from other CLK signals
+    397                      if (clockSourceDivider != CS_CLOCK_DIVIDER_1) {
+    398                          if (clockSourceDivider == CS_CLOCK_DIVIDER_640) {
+    399                              HWREG8(CS_BASE + OFS_CSCTL3) = temp & ~(FLLREFDIV_7) | (clockSourceDivider - 10);
+    400                          }
+    401                          else if (clockSourceDivider != CS_CLOCK_DIVIDER_512) {
+    402                              HWREG8(CS_BASE + OFS_CSCTL3) = temp & ~(FLLREFDIV_7) | (clockSourceDivider - 4);
+    403                          }
+    404                          else {
+    405                              HWREG8(CS_BASE + OFS_CSCTL3) = temp & ~(FLLREFDIV_7) | (clockSourceDivider - 5);
+    406                          }
+    407                      }
+    408                      break;
+    409              }
+    410          }
+    411          
+    412          void CS_turnOnXT1LF( uint16_t xt1Drive){
+    413              //Switch ON XT1 oscillator
+    414              HWREG16(CS_BASE + OFS_CSCTL6) &= ~XT1AUTOOFF;
+    415          
+    416              //Highest drive setting for turnOnXT1
+    417              HWREG16(CS_BASE + OFS_CSCTL6_L) |= XT1DRIVE1_L | XT1DRIVE0_L;
+    418          
+    419              //Enable LF mode and clear bypass
+    420              HWREG16(CS_BASE + OFS_CSCTL6) &= ~(XTS | XT1BYPASS);
+    421              
+    422              while (HWREG8(CS_BASE + OFS_CSCTL7) & XT1OFFG)
+    423              {
+    424                  //Clear OSC fault flag
+    425                  HWREG8(CS_BASE + OFS_CSCTL7) &= ~(XT1OFFG);
+    426          
+    427                  //Clear OFIFG fault flag
+    428                  HWREG8(SFR_BASE + OFS_SFRIFG1) &= ~OFIFG;
+    429              }
+    430          
+    431              //set requested Drive mode
+    432              HWREG16(CS_BASE + OFS_CSCTL6) = ( HWREG16(CS_BASE + OFS_CSCTL6) &
+    433                                                   ~(XT1DRIVE_3)
+    434                                                   ) |
+    435                                                 (xt1Drive);
+    436          }
+    437          
+    438          void CS_bypassXT1(void)
+    439          {
+    440              //Enable HF/LF mode
+    441              HWREG16(CS_BASE + OFS_CSCTL6) &= ~XTS;
+    442          
+    443              //Switch OFF XT1 oscillator and enable BYPASS mode
+    444              HWREG16(CS_BASE + OFS_CSCTL6) |= (XT1BYPASS | XT1AUTOOFF);
+    445          
+    446              while (HWREG8(CS_BASE + OFS_CSCTL7) & (XT1OFFG)) {
+    447                  //Clear OSC fault flags
+    448                  HWREG8(CS_BASE + OFS_CSCTL7) &= ~(XT1OFFG);
+    449          
+    450                  // Clear the global fault flag. In case the XT1 caused the global fault
+    451                  // flag to get set this will clear the global error condition. If any
+    452                  // error condition persists, global flag will get again.
+    453                  HWREG8(SFR_BASE + OFS_SFRIFG1) &= ~OFIFG;
+    454              }
+    455          }
+    456          
+    457          bool CS_turnOnXT1LFWithTimeout(uint16_t xt1Drive,
+    458              uint16_t timeout
+    459              )
+    460          {
+    461              //Switch ON XT1 oscillator
+    462              HWREG16(CS_BASE + OFS_CSCTL6) &= ~XT1AUTOOFF;
+    463          
+    464              //Highest drive setting for turnOnXT1
+    465              HWREG16(CS_BASE + OFS_CSCTL6_L) |= XT1DRIVE1_L | XT1DRIVE0_L;
+    466          
+    467                 //Enable LF mode and clear bypass
+    468              HWREG16(CS_BASE + OFS_CSCTL6) &= ~(XTS | XT1BYPASS);
+    469              
+    470              do
+    471              {
+    472                  HWREG8(CS_BASE + OFS_CSCTL7) &= ~(XT1OFFG);
+    473          
+    474                  //Clear OFIFG fault flag
+    475                  HWREG8(SFR_BASE + OFS_SFRIFG1) &= ~OFIFG;
+    476              } while ((HWREG8(CS_BASE + OFS_CSCTL7) & XT1OFFG) && --timeout);
+    477          
+    478              if (timeout) {
+    479                  //set requested Drive mode
+    480                  HWREG16(CS_BASE + OFS_CSCTL6) = ( HWREG16(CS_BASE + OFS_CSCTL6) &
+    481                                                       ~(XT1DRIVE_3)
+    482                                                       ) |
+    483                                                     (xt1Drive);
+    484                  return (STATUS_SUCCESS);
+    485              }
+    486              else {
+    487                  return (STATUS_FAIL);
+    488              }
+    489          }
+    490          
+    491          bool CS_bypassXT1WithTimeout(uint16_t timeout
+    492              )
+    493          {
+    494              //Enable HF/LF mode
+    495              HWREG16(CS_BASE + OFS_CSCTL6) &= ~XTS;
+    496          
+    497              //Switch OFF XT1 oscillator  and enable bypass
+    498              HWREG16(CS_BASE + OFS_CSCTL6) |= (XT1BYPASS | XT1AUTOOFF);
+    499          
+    500              do {
+    501                  //Clear OSC fault flags
+    502                  HWREG8(CS_BASE + OFS_CSCTL7) &= ~(XT1OFFG);
+    503          
+    504                  // Clear the global fault flag. In case the XT1 caused the global fault
+    505                  // flag to get set this will clear the global error condition. If any
+    506                  // error condition persists, global flag will get again.
+    507                  HWREG8(SFR_BASE + OFS_SFRIFG1) &= ~OFIFG;
+    508              }while ((HWREG8(CS_BASE + OFS_CSCTL7) & (XT1OFFG)) && --timeout);
+    509          
+    510              if (timeout) {
+    511                  return (STATUS_SUCCESS);
+    512              }
+    513              else {
+    514                  return (STATUS_FAIL);
+    515              }
+    516          }
+    517          
+    518          void CS_turnOffXT1(void)
+    519          {
+    520              //Switch off XT1 oscillator
+    521              HWREG16(CS_BASE + OFS_CSCTL6) |= XT1AUTOOFF;
+    522          }
+    523          
+    524          void CS_turnOnXT1HF( uint16_t xt1Drive, uint16_t xt1HFFreq){
+    525          #ifdef XT1HFFREQ_3
+    526              //Switch ON XT1 oscillator
+    527              HWREG16(CS_BASE + OFS_CSCTL6) &= ~XT1AUTOOFF;
+    528          
+    529              //Enable HF and highest drive setting for XT1
+    530              HWREG16(CS_BASE + OFS_CSCTL6_L) |= XTS | XT1DRIVE1_L | XT1DRIVE0_L;
+    531          
+    532              //Clear bypass
+    533              HWREG16(CS_BASE + OFS_CSCTL6) &= ~XT1BYPASS;
+    534          
+    535              while (HWREG8(CS_BASE + OFS_CSCTL7) & XT1OFFG)
+    536              {
+    537                  //Clear OSC fault flag
+    538                  HWREG8(CS_BASE + OFS_CSCTL7) &= ~(XT1OFFG);
+    539          
+    540                  //Clear OFIFG fault flag
+    541                  HWREG8(SFR_BASE + OFS_SFRIFG1) &= ~OFIFG;
+    542              }
+    543          
+    544              //set requested Drive mode
+    545              HWREG16(CS_BASE + OFS_CSCTL6) = (HWREG16(CS_BASE + OFS_CSCTL6) &
+    546                                                  ~(XT1DRIVE_3|XT1HFFREQ_3)) |
+    547                                                  xt1Drive | xt1HFFreq;
+    548          #endif
+    549          }
+    550          
+    551          bool CS_turnOnXT1HFWithTimeout( uint16_t xt1Drive,uint16_t xt1HFFreq,
+    552                  uint16_t timeout)
+    553          {
+    554          #ifdef XT1HFFREQ_3
+    555              //Switch ON XT1 oscillator
+    556              HWREG16(CS_BASE + OFS_CSCTL6) &= ~XT1AUTOOFF;
+    557          
+    558              //Enable HF and highest drive setting for XT1
+    559              HWREG16(CS_BASE + OFS_CSCTL6_L) |= XTS | XT1DRIVE1_L | XT1DRIVE0_L;
+    560          
+    561              //Clear bypass
+    562              HWREG16(CS_BASE + OFS_CSCTL6) &= ~XT1BYPASS;
+    563          
+    564              do
+    565              {
+    566                  HWREG8(CS_BASE + OFS_CSCTL7) &= ~(XT1OFFG);
+    567          
+    568                  //Clear OFIFG fault flag
+    569                  HWREG8(SFR_BASE + OFS_SFRIFG1) &= ~OFIFG;
+    570              }while ((HWREG8(CS_BASE + OFS_CSCTL7) & XT1OFFG) && --timeout);
+    571          
+    572              if (timeout) {
+    573                  //set requested Drive mode
+    574                  HWREG16(CS_BASE + OFS_CSCTL6) = (HWREG16(CS_BASE + OFS_CSCTL6) &
+    575                                                      ~(XT1DRIVE_3|XT1HFFREQ_3)) |
+    576                                                      xt1Drive | xt1HFFreq;
+    577          
+    578                  return (STATUS_SUCCESS);
+    579              }
+    580              else {
+    581                  return (STATUS_FAIL);
+    582              }
+    583          #else
+    584              return (STATUS_FAIL);
+    585          #endif
+    586          }
+    587          
+    588          void CS_turnOnSMCLK (void)
+    589          {
+    590              //Turn on SMCLK
+    591              HWREG16(CS_BASE + OFS_CSCTL5) &= ~SMCLKOFF;
+    592          }
+    593          
+    594          void CS_turnOffSMCLK (void)
+    595          {
+    596              //Turn off SMCLK
+    597              HWREG16(CS_BASE + OFS_CSCTL5) |= SMCLKOFF;
+    598          }
+    599          
+    600          void CS_enableVLOAutoOff (void)
+    601          {
+    602              //Enable VLO Auto Off
+    603              HWREG16(CS_BASE + OFS_CSCTL5) |= VLOAUTOOFF;
+    604          }
+    605          
+    606          void CS_disableVLOAutoOff (void)
+    607          {
+    608              //Disable VLO Auto Off
+    609              HWREG16(CS_BASE + OFS_CSCTL5) &= ~VLOAUTOOFF;
+    610          }
+    611          
+    612          bool CS_initFLLSettle(uint16_t fsystem,
+    613              uint16_t ratio
+    614              )
+    615          {
+    616              volatile uint16_t x = ratio * 32;
+    617          
+    618              bool status = CS_initFLL(fsystem, ratio);
+    619          
+    620              while (x--)
+    621              {
+    622                  __delay_cycles(30);
+    623              }
+    624              
+    625              return status;
+    626          }
+    627          
+    628          bool CS_initFLL(uint16_t fsystem,
+    629              uint16_t ratio
+    630              )
+    631          {
+    632              uint16_t dco_FLLN, dco_FLLD = FLLD__1;
+    633              bool status = true;
+    634          
+    635              //Save actual state of FLL loop control, then disable it. This is needed to
+    636              //prevent the FLL from acting as we are making fundamental modifications to
+    637              //the clock setup.
+    638              uint16_t srRegisterState = __get_SR_register() & SCG0;
+    639          
+    640              //Do not want the Oscillator Fault Flag to trigger during this routine.
+    641              //So disable interrupt, save the state, and reapply later if necessary.
+    642              uint8_t sfr_ofie_status = HWREG8(SFR_BASE + OFS_SFRIE1_L) & OFIE;
+    643              HWREG8(SFR_BASE + OFS_SFRIE1_L) &= ~(OFIE);
+    644          
+    645              //Have at least a divider of 2
+    646              dco_FLLN = ratio;
+    647          
+    648              // Disable FLL
+    649              __bis_SR_register(SCG0);
+    650          
+    651              //Set DCO to lowest Tap
+    652              HWREG16(CS_BASE + OFS_CSCTL0) &= ~( DCO8 |
+    653                                                      DCO7 |
+    654                                                      DCO6 |
+    655                                                      DCO5 |
+    656                                                      DCO4 |
+    657                                                      DCO3 |
+    658                                                      DCO2 |
+    659                                                      DCO1 |
+    660                                                      DCO0
+    661                                                  );
+    662          
+    663              //Reset FLLN bits
+    664              HWREG16(CS_BASE + OFS_CSCTL2) &= ~( FLLN9 |
+    665                                                      FLLN8 |
+    666                                                      FLLN7 |
+    667                                                      FLLN6 |
+    668                                                      FLLN5 |
+    669                                                      FLLN4 |
+    670                                                      FLLN3 |
+    671                                                      FLLN2 |
+    672                                                      FLLN1 |
+    673                                                      FLLN0
+    674                                                  );
+    675              HWREG16(CS_BASE + OFS_CSCTL2) = dco_FLLD | (dco_FLLN - 1);
+    676          
+    677              HWREG8(CS_BASE + OFS_CSCTL1) &= ~DCORSEL_7;
+    678              if (fsystem <= 1500) {            //fsystem <= 1.5MHz
+    679                  HWREG8(CS_BASE + OFS_CSCTL1) |= DCORSEL_0;
+    680              }
+    681              else if (fsystem <=  3000) {      //1.5MHz < fsystem <= 3MHz
+    682                  HWREG8(CS_BASE + OFS_CSCTL1) |= DCORSEL_1;
+    683              }
+    684              else if (fsystem <=  6000) {      //3MHz < fsystem <= 6MHz
+    685                  HWREG8(CS_BASE + OFS_CSCTL1) |= DCORSEL_2;
+    686              }
+    687              else if (fsystem <=  10000) {     //6MHz < fsystem <= 10MHz
+    688                  HWREG8(CS_BASE + OFS_CSCTL1) |= DCORSEL_3;
+    689              }
+    690              else if (fsystem <=  14000) {     //10MHz < fsystem <= 14MHz
+    691                  HWREG8(CS_BASE + OFS_CSCTL1) |= DCORSEL_4;
+    692              }
+    693              else if (fsystem <=  18000) {     //14MHz < fsystem <= 18MHz
+    694                  HWREG8(CS_BASE + OFS_CSCTL1) |= DCORSEL_5;
+    695              }
+    696              else if (fsystem <=  22000) {     //18MHz < fsystem <= 22MHz
+    697                  HWREG8(CS_BASE + OFS_CSCTL1) |= DCORSEL_6;
+    698              }
+    699              else if (fsystem <=  24000) {     //22MHz < fsystem <= 24MHz
+    700                  HWREG8(CS_BASE + OFS_CSCTL1) |= DCORSEL_7;
+    701              }
+    702              else {
+    703                  //exceeds 24MHz, not supported
+    704                  status =  false;
+    705              }
+    706          
+    707              // Re-enable FLL
+    708              __bic_SR_register(SCG0);
+    709              
+    710              while ((HWREG16(CS_BASE + OFS_CSCTL7) & (FLLUNLOCK0 | FLLUNLOCK1)) ||
+    711              (HWREG8(CS_BASE + OFS_CSCTL7_L) & DCOFFG))
+    712              {
+    713                  //Clear OSC fault flags
+    714                  HWREG8(CS_BASE + OFS_CSCTL7_L) &= ~(DCOFFG);
+    715          
+    716                  //Clear OFIFG fault flag
+    717                  HWREG8(SFR_BASE + OFS_SFRIFG1) &= ~OFIFG;
+    718              }
+    719          
+    720              // Restore previous SCG0
+    721              __bis_SR_register(srRegisterState);
+    722          
+    723              // Reapply Oscillator Fault Interrupt Enable if needed
+    724              HWREG8(SFR_BASE + OFS_SFRIE1_L) |= sfr_ofie_status;
+    725          
+    726              return status;
+    727          }
+    728          
+    729          bool CS_initFLLCalculateTrim(uint16_t fsystem,
+    730              uint16_t ratio,
+    731              CS_initFLLParam *param
+    732              )
+    733          {
+    734              uint16_t dco_FLLN, dco_FLLD = FLLD__1;
+    735              bool status = true;
+    736              volatile uint16_t x = ratio * 32;
+    737          
+    738              //Save actual state of FLL loop control, then disable it. This is needed to
+    739              //prevent the FLL from acting as we are making fundamental modifications to
+    740              //the clock setup.
+    741              uint16_t srRegisterState = __get_SR_register() & SCG0;
+    742          
+    743              //Do not want the Oscillator Fault Flag to trigger during this routine.
+    744              //So disable interrupt, save the state, and reapply later if necessary.
+    745              uint8_t sfr_ofie_status = HWREG8(SFR_BASE + OFS_SFRIE1_L) & OFIE;
+    746              HWREG8(SFR_BASE + OFS_SFRIE1_L) &= ~(OFIE);
+    747          
+    748              //Have at least a divider of 2
+    749              dco_FLLN = ratio;
+    750          
+    751              // Disable FLL
+    752              __bis_SR_register(SCG0);
+    753          
+    754              //Set DCO to lowest Tap
+    755              HWREG16(CS_BASE + OFS_CSCTL0) &= ~( DCO8 |
+    756                                                      DCO7 |
+    757                                                      DCO6 |
+    758                                                      DCO5 |
+    759                                                      DCO4 |
+    760                                                      DCO3 |
+    761                                                      DCO2 |
+    762                                                      DCO1 |
+    763                                                      DCO0
+    764                                                  );
+    765              //Reset FLLN bits
+    766              HWREG16(CS_BASE + OFS_CSCTL2) &= ~( FLLN9 |
+    767                                                      FLLN8 |
+    768                                                      FLLN7 |
+    769                                                      FLLN6 |
+    770                                                      FLLN5 |
+    771                                                      FLLN4 |
+    772                                                      FLLN3 |
+    773                                                      FLLN2 |
+    774                                                      FLLN1 |
+    775                                                      FLLN0
+    776                                                  );
+    777              HWREG16(CS_BASE + OFS_CSCTL2) = dco_FLLD | (dco_FLLN - 1);
+    778          
+    779              HWREG8(CS_BASE + OFS_CSCTL1) &= ~DCORSEL_7;
+    780              if (fsystem <= 1500) {            //fsystem <= 1.5MHz
+    781                  HWREG8(CS_BASE + OFS_CSCTL1) |= DCORSEL_0;
+    782              }
+    783              else if (fsystem <=  3000) {      //1.5MHz < fsystem <= 3MHz
+    784                  HWREG8(CS_BASE + OFS_CSCTL1) |= DCORSEL_1;
+    785              }
+    786              else if (fsystem <=  6000) {      //3MHz < fsystem <= 6MHz
+    787                  HWREG8(CS_BASE + OFS_CSCTL1) |= DCORSEL_2;
+    788              }
+    789              else if (fsystem <=  10000) {     //6MHz < fsystem <= 10MHz
+    790                  HWREG8(CS_BASE + OFS_CSCTL1) |= DCORSEL_3;
+    791              }
+    792              else if (fsystem <=  14000) {     //10MHz < fsystem <= 14MHz
+    793                  HWREG8(CS_BASE + OFS_CSCTL1) |= DCORSEL_4;
+    794              }
+    795              else if (fsystem <=  18000) {     //14MHz < fsystem <= 18MHz
+    796                  HWREG8(CS_BASE + OFS_CSCTL1) |= DCORSEL_5;
+    797              }
+    798              else if (fsystem <=  22000) {     //18MHz < fsystem <= 22MHz
+    799                  HWREG8(CS_BASE + OFS_CSCTL1) |= DCORSEL_6;
+    800              }
+    801              else if (fsystem <=  24000) {     //22MHz < fsystem <= 24MHz
+    802                  HWREG8(CS_BASE + OFS_CSCTL1) |= DCORSEL_7;
+    803              }
+    804              else {
+    805                  //exceeds 24MHz, not supported
+    806                  status = false;
+    807              }
+    808          
+    809              // Re-enable FLL
+    810              __bic_SR_register(SCG0);
+    811              
+    812              // Enable DCO frequency trim
+    813              HWREG16(CS_BASE + OFS_CSCTL1) |= DCOFTRIMEN;
+    814          
+    815              // Calculates DCO frequency trim values and stores them in struct pointer
+    816              param->fsystem = fsystem;
+    817              privateCSComputeDCOFTrim(param);
+    818              
+    819              while ((HWREG16(CS_BASE + OFS_CSCTL7) & (FLLUNLOCK0 | FLLUNLOCK1)) ||
+    820                  (HWREG8(CS_BASE + OFS_CSCTL7_L) & DCOFFG))
+    821              {
+    822                  //Clear OSC fault flags
+    823                  HWREG8(CS_BASE + OFS_CSCTL7_L) &= ~(DCOFFG);
+    824          
+    825                  //Clear OFIFG fault flag
+    826                  HWREG8(SFR_BASE + OFS_SFRIFG1) &= ~OFIFG;
+    827              }
+    828          
+    829              // Restore previous SCG0
+    830              __bis_SR_register(srRegisterState);
+    831              
+    832              while (x--)
+    833              {
+    834                  __delay_cycles(30);
+    835              }
+    836              // Reapply Oscillator Fault Interrupt Enable if needed
+    837              HWREG8(SFR_BASE + OFS_SFRIE1_L) |= sfr_ofie_status;
+    838              
+    839              return status;
+    840          }
+    841          
+    842          bool CS_initFLLLoadTrim(uint16_t fsystem,
+    843              uint16_t ratio,
+    844              CS_initFLLParam *param
+    845              )
+    846          {
+    847              if(param->fsystem != fsystem)
+    848              {
+    849                  // Protection against wrong clock frequency and trim combination
+    850                  return false;
+    851              }
+    852              
+    853              uint16_t dco_FLLN, dco_FLLD = FLLD__1;
+    854              bool status = true;
+    855              volatile uint16_t x = ratio * 32;
+    856          
+    857              //Save actual state of FLL loop control, then disable it. This is needed to
+    858              //prevent the FLL from acting as we are making fundamental modifications to
+    859              //the clock setup.
+    860              uint16_t srRegisterState = __get_SR_register() & SCG0;
+    861          
+    862              //Do not want the Oscillator Fault Flag to trigger during this routine.
+    863              //So disable interrupt, save the state, and reapply later if necessary.
+    864              uint8_t sfr_ofie_status = HWREG8(SFR_BASE + OFS_SFRIE1_L) & OFIE;
+    865              HWREG8(SFR_BASE + OFS_SFRIE1_L) &= ~(OFIE);
+    866          
+    867              //Have at least a divider of 2
+    868              dco_FLLN = ratio;
+    869              
+    870              // Disable FLL
+    871              __bis_SR_register(SCG0);
+    872              
+    873              //Set DCO to proper tap
+    874              HWREG16(CS_BASE + OFS_CSCTL0) &= ~( DCO8 |
+    875                                                      DCO7 |
+    876                                                      DCO6 |
+    877                                                      DCO5 |
+    878                                                      DCO4 |
+    879                                                      DCO3 |
+    880                                                      DCO2 |
+    881                                                      DCO1 |
+    882                                                      DCO0
+    883                                                      );
+    884              HWREG16(CS_BASE + OFS_CSCTL0) |= (param->csCtl0 &
+    885                                                  (   DCO8 |
+    886                                                      DCO7 |
+    887                                                      DCO6 |
+    888                                                      DCO5 |
+    889                                                      DCO4 |
+    890                                                      DCO3 |
+    891                                                      DCO2 |
+    892                                                      DCO1 |
+    893                                                      DCO0
+    894                                                      ));
+    895          
+    896              //Reset FLLN bits
+    897              HWREG16(CS_BASE + OFS_CSCTL2) &= ~( FLLN9 |
+    898                                                      FLLN8 |
+    899                                                      FLLN7 |
+    900                                                      FLLN6 |
+    901                                                      FLLN5 |
+    902                                                      FLLN4 |
+    903                                                      FLLN3 |
+    904                                                      FLLN2 |
+    905                                                      FLLN1 |
+    906                                                      FLLN0
+    907                                                  );
+    908              HWREG16(CS_BASE + OFS_CSCTL2) = dco_FLLD | (dco_FLLN - 1);
+    909              
+    910              // Set proper DCORSEL value
+    911              HWREG8(CS_BASE + OFS_CSCTL1) &= ~DCORSEL_7;
+    912              if (fsystem <= 1500) {            //fsystem <= 1.5MHz
+    913                  HWREG8(CS_BASE + OFS_CSCTL1) |= DCORSEL_0;
+    914              }
+    915              else if (fsystem <=  3000) {      //1.5MHz < fsystem <= 3MHz
+    916                  HWREG8(CS_BASE + OFS_CSCTL1) |= DCORSEL_1;
+    917              }
+    918              else if (fsystem <=  6000) {      //3MHz < fsystem <= 6MHz
+    919                  HWREG8(CS_BASE + OFS_CSCTL1) |= DCORSEL_2;
+    920              }
+    921              else if (fsystem <=  10000) {     //6MHz < fsystem <= 10MHz
+    922                  HWREG8(CS_BASE + OFS_CSCTL1) |= DCORSEL_3;
+    923              }
+    924              else if (fsystem <=  14000) {     //10MHz < fsystem <= 14MHz
+    925                  HWREG8(CS_BASE + OFS_CSCTL1) |= DCORSEL_4;
+    926              }
+    927              else if (fsystem <=  18000) {     //14MHz < fsystem <= 18MHz
+    928                  HWREG8(CS_BASE + OFS_CSCTL1) |= DCORSEL_5;
+    929              }
+    930              else if (fsystem <=  22000) {     //18MHz < fsystem <= 22MHz
+    931                  HWREG8(CS_BASE + OFS_CSCTL1) |= DCORSEL_6;
+    932              }
+    933              else if (fsystem <=  24000) {     //22MHz < fsystem <= 24MHz
+    934                  HWREG8(CS_BASE + OFS_CSCTL1) |= DCORSEL_7;
+    935              }
+    936              else {
+    937                  //exceeds 24MHz, not supported
+    938                  status = false;
+    939              }
+    940              
+    941              // Enable DCO frequency trim
+    942              HWREG16(CS_BASE + OFS_CSCTL1) |= DCOFTRIMEN;
+    943              
+    944              // Set proper DCOFTRIM value
+    945              HWREG16(CS_BASE + OFS_CSCTL1) &= ~(DCOFTRIM0 | DCOFTRIM1 | DCOFTRIM2);
+    946              HWREG16(CS_BASE + OFS_CSCTL1) |= (param->csCtl1 & (DCOFTRIM0 | DCOFTRIM1 | DCOFTRIM2));
+    947          
+    948              // Re-enable FLL
+    949              __bic_SR_register(SCG0);
+    950              
+    951              while ((HWREG16(CS_BASE + OFS_CSCTL7) & (FLLUNLOCK0 | FLLUNLOCK1)) ||
+    952                  (HWREG8(CS_BASE + OFS_CSCTL7_L) & DCOFFG))
+    953              {
+    954                  //Clear OSC fault flags
+    955                  HWREG8(CS_BASE + OFS_CSCTL7_L) &= ~(DCOFFG);
+    956          
+    957                  //Clear OFIFG fault flag
+    958                  HWREG8(SFR_BASE + OFS_SFRIFG1) &= ~OFIFG;
+    959              }
+    960          
+    961              // Restore previous SCG0
+    962              __bis_SR_register(srRegisterState);
+    963              
+    964              while (x--)
+    965              {
+    966                  __delay_cycles(30);
+    967              }
+    968              // Reapply Oscillator Fault Interrupt Enable if needed
+    969              HWREG8(SFR_BASE + OFS_SFRIE1_L) |= sfr_ofie_status;
+    970              
+    971              return status;
+    972          }
+    973          
+    974          void CS_enableClockRequest(uint8_t selectClock
+    975              )
+    976          {
+    977              HWREG8(CS_BASE + OFS_CSCTL8) |= selectClock;
+    978          }
+    979          
+    980          void CS_disableClockRequest(uint8_t selectClock
+    981              )
+    982          {
+    983              HWREG8(CS_BASE + OFS_CSCTL8) &= ~selectClock;
+    984          }
+    985          
+    986          uint8_t CS_getFaultFlagStatus(uint8_t mask
+    987              )
+    988          {
+    989              return (HWREG8(CS_BASE + OFS_CSCTL7) & mask);
+    990          }
+    991          
+    992          void CS_clearFaultFlag(uint8_t mask
+    993              )
+    994          {
+    995              HWREG8(CS_BASE + OFS_CSCTL7) &= ~mask;
+    996          }
+    997          
+    998          uint32_t CS_getACLK(void)
+    999          {
+   1000              //Find ACLK source
+   1001              uint16_t ACLKSource = (HWREG16(CS_BASE + OFS_CSCTL4) & SELA);
+   1002          
+   1003              ACLKSource = ACLKSource >> 8;
+   1004          
+   1005              if (ACLKSource == 0x0) {
+   1006                  ACLKSource = SELMS__XT1CLK;
+   1007              }
+   1008              else if (ACLKSource == 0x1) {
+   1009                  ACLKSource = SELMS__REFOCLK;
+   1010              }
+   1011              else {
+   1012                  ACLKSource = SELMS__VLOCLK;
+   1013              }
+   1014          
+   1015              uint16_t ACLKSourceDivider = 0;
+   1016          #ifdef DIVA0
+   1017              if (HWREG16(CS_BASE + OFS_CSCTL6) & XTS) {
+   1018          
+   1019                  uint16_t div = (HWREG16(CS_BASE + OFS_CSCTL6) &
+   1020                          (DIVA0|DIVA1|DIVA2|DIVA3)) >>8;
+   1021                  switch(div) {
+   1022                  case 1:
+   1023                  case 2:
+   1024                  case 3:
+   1025                  case 4:
+   1026                  case 5:
+   1027                      ACLKSourceDivider = 8*(1<<div);
+   1028                      break;
+   1029                  case 6:
+   1030                      ACLKSourceDivider = 384;
+   1031                      break;
+   1032                  case 7:
+   1033                      ACLKSourceDivider = 512;
+   1034                      break;
+   1035                  case 8:
+   1036                      ACLKSourceDivider = 768;
+   1037                      break;
+   1038                  case 9:
+   1039                      ACLKSourceDivider = 1024;
+   1040                      break;
+   1041                  case 10:
+   1042                      ACLKSourceDivider = 108;
+   1043                      break;
+   1044                  case 11:
+   1045                      ACLKSourceDivider = 338;
+   1046                      break;
+   1047                  case 12:
+   1048                      ACLKSourceDivider = 414;
+   1049                      break;
+   1050                  case 13:
+   1051                      ACLKSourceDivider = 640;
+   1052                      break;
+   1053                  default:
+   1054                      break;
+   1055                  }
+   1056              }
+   1057          #endif
+   1058              return (privateCSComputeCLKFrequency(
+   1059                      ACLKSource,
+   1060                      ACLKSourceDivider,
+   1061                      CS_ACLK)
+   1062                      );
+   1063          }
+   1064          
+   1065          uint32_t CS_getSMCLK(void)
+   1066          {
+   1067              uint16_t SMCLKSource = HWREG8(CS_BASE + OFS_CSCTL4_L) & SELMS_7;
+   1068          
+   1069              uint16_t SMCLKSourceDivider =
+   1070                  HWREG16(CS_BASE + OFS_CSCTL5) & DIVS_3;
+   1071              SMCLKSourceDivider = SMCLKSourceDivider >> 4;
+   1072          
+   1073              return (privateCSComputeCLKFrequency(
+   1074                          SMCLKSource,
+   1075                          SMCLKSourceDivider,
+   1076                          CS_SMCLK)
+   1077                      );
+   1078          }
+   1079          
+   1080          uint32_t CS_getMCLK(void)
+   1081          {
+   1082              //Find AMCLK source
+   1083              uint16_t MCLKSource = (HWREG16(CS_BASE + OFS_CSCTL4) & SELMS_7);
+   1084          
+   1085              uint16_t MCLKSourceDivider =  HWREG16(CS_BASE + OFS_CSCTL5) & DIVM_7;
+   1086          
+   1087              return (privateCSComputeCLKFrequency(
+   1088                          MCLKSource,
+   1089                          MCLKSourceDivider,
+   1090                          CS_MCLK)
+   1091                      );
+   1092          }
+   1093          
+   1094          uint16_t CS_clearAllOscFlagsWithTimeout( uint16_t timeout){
+   1095              do {
+   1096                // Clear all osc fault flags
+   1097                HWREG8(CS_BASE + OFS_CSCTL7) &= ~(DCOFFG | XT1OFFG);
+   1098          
+   1099                // Clear the global osc fault flag.
+   1100                HWREG8(SFR_BASE + OFS_SFRIFG1) &= ~OFIFG;
+   1101                
+   1102                // Check XT1 fault flags
+   1103              } while ((HWREG8(SFR_BASE + OFS_SFRIFG1) & OFIFG) && --timeout);
+   1104          
+   1105              return (HWREG8(CS_BASE + OFS_CSCTL7) & (DCOFFG | XT1OFFG));
+   1106          }
+   1107          
+   1108          void CS_enableXT1AutomaticGainControl(void)
+   1109          {
+   1110              HWREG16(CS_BASE + OFS_CSCTL6) &= ~XT1AGCOFF;
+   1111          }
+   1112          
+   1113          void CS_disableXT1AutomaticGainControl(void)
+   1114          {
+   1115              HWREG16(CS_BASE + OFS_CSCTL6) |= XT1AGCOFF;
+   1116          }
+   1117          
+   1118          void CS_enableFLLUnlock(void)
+   1119          {
+   1120              HWREG16(CS_BASE + OFS_CSCTL7) |= FLLULPUC;
+   1121          }
+   1122          
+   1123          void CS_disableFLLUnlock(void)
+   1124          {
+   1125              HWREG16(CS_BASE + OFS_CSCTL7) &= ~FLLULPUC;
+   1126          }
+   1127          
+   1128          void CS_enableREFOLP(void)
+   1129          {
+   1130          #ifdef REFOLP
+   1131              HWREG16(CS_BASE + OFS_CSCTL3) |= REFOLP;
+   1132          #endif
+   1133          }
+   1134          
+   1135          void CS_disableREFOLP(void)
+   1136          {
+   1137          #ifdef REFOLP
+   1138              HWREG16(CS_BASE + OFS_CSCTL3) &= ~REFOLP;
+   1139          #endif
+   1140          }
+   1141          
+   1142          bool CS_getREFOLP(void)
+   1143          {
+   1144          #ifdef REFOLP
+   1145              return ((HWREG16(CS_BASE + OFS_CSCTL3) & REFOLP) ? true : false);
+   1146          #else
+   1147              return false;
+   1148          #endif
+   1149          }
+   1150          
+   1151          void CS_enableXT1FaultOff(void)
+   1152          {
+   1153          #ifdef XT1FAULTOFF
+   1154              HWREG16(CS_BASE + OFS_CSCTL6) |= XT1FAULTOFF;
+   1155          #endif
+   1156          }
+   1157          
+   1158          void CS_disableXT1FaultOff(void)
+   1159          {
+   1160          #ifdef XT1FAULTOFF
+   1161              HWREG16(CS_BASE + OFS_CSCTL6) &= ~XT1FAULTOFF;
+   1162          #endif
+   1163          }
+   1164          
+   1165          bool CS_getXT1FaultOff(void)
+   1166          {
+   1167          #ifdef XT1FAULTOFF
+   1168              return ((HWREG16(CS_BASE + OFS_CSCTL6) & XT1FAULTOFF) ? true : false);
+   1169          #else
+   1170              return false;
+   1171          #endif
+   1172          }
+   1173          
+   1174          bool CS_getREFOReady(void)
+   1175          {
+   1176          #ifdef REFOREADY
+   1177              return ((HWREG16(CS_BASE + OFS_CSCTL7) & REFOREADY) ? true : false);
+   1178          #else
+   1179              return false;
+   1180          #endif
+   1181          }
+   1182          
+   1183          #endif
+   1184          //*****************************************************************************
+   1185          //
+   1186          //! Close the doxygen group for cs_api
+   1187          //! @}
+   1188          //
+   1189          //*****************************************************************************
+
+   Maximum stack usage in bytes:
+
+   CSTACK Function
+   ------ --------
+      4   CS_bypassXT1
+      4   CS_bypassXT1WithTimeout
+      4   CS_clearAllOscFlagsWithTimeout
+      4   CS_clearFaultFlag
+      4   CS_disableClockRequest
+      4   CS_disableFLLUnlock
+      4   CS_disableREFOLP
+      4   CS_disableVLOAutoOff
+      4   CS_disableXT1AutomaticGainControl
+      4   CS_disableXT1FaultOff
+      4   CS_enableClockRequest
+      4   CS_enableFLLUnlock
+      4   CS_enableREFOLP
+      4   CS_enableVLOAutoOff
+      4   CS_enableXT1AutomaticGainControl
+      4   CS_enableXT1FaultOff
+      4   CS_getACLK
+        0   -> privateCSComputeCLKFrequency
+      4   CS_getFaultFlagStatus
+      4   CS_getMCLK
+        0   -> privateCSComputeCLKFrequency
+      4   CS_getREFOLP
+      4   CS_getREFOReady
+      4   CS_getSMCLK
+        0   -> privateCSComputeCLKFrequency
+      4   CS_getXT1FaultOff
+      4   CS_initClockSignal
+      8   CS_initFLL
+     14   CS_initFLLCalculateTrim
+       14   -> privateCSComputeDCOFTrim
+     14   CS_initFLLLoadTrim
+      6   CS_initFLLSettle
+        6   -> CS_initFLL
+      4   CS_setExternalClockSource
+      4   CS_turnOffSMCLK
+      4   CS_turnOffXT1
+      4   CS_turnOnSMCLK
+      4   CS_turnOnXT1HF
+      4   CS_turnOnXT1HFWithTimeout
+      4   CS_turnOnXT1LF
+      4   CS_turnOnXT1LFWithTimeout
+     12   privateCSComputeCLKFrequency
+       12   -> privateCSSourceClockFromDCO
+       12   -> privateDCORange
+       12 ?DivMod16s
+       12 ?DivMod16u
+       12 ?DivMod32u
+     22   privateCSComputeDCOFTrim
+      6   privateCSSourceClockFromDCO
+        6   -> privateDCORange
+        6 ?DivMod32u
+        6 ?Mul32
+      4   privateDCORange
+
+
+   Segment part sizes:
+
+   Bytes  Function/Label
+   -----  --------------
+      30  CS_bypassXT1
+      44  CS_bypassXT1WithTimeout
+      34  CS_clearAllOscFlagsWithTimeout
+       6  CS_clearFaultFlag
+       6  CS_disableClockRequest
+       8  CS_disableFLLUnlock
+       2  CS_disableREFOLP
+       8  CS_disableVLOAutoOff
+       6  CS_disableXT1AutomaticGainControl
+       2  CS_disableXT1FaultOff
+       6  CS_enableClockRequest
+       8  CS_enableFLLUnlock
+       2  CS_enableREFOLP
+       8  CS_enableVLOAutoOff
+       6  CS_enableXT1AutomaticGainControl
+       2  CS_enableXT1FaultOff
+      42  CS_getACLK
+       6  CS_getFaultFlagStatus
+      22  CS_getMCLK
+       4  CS_getREFOLP
+       4  CS_getREFOReady
+      26  CS_getSMCLK
+       4  CS_getXT1FaultOff
+     202  CS_initClockSignal
+     202  CS_initFLL
+     258  CS_initFLLCalculateTrim
+     288  CS_initFLLLoadTrim
+      46  CS_initFLLSettle
+      10  CS_setExternalClockSource
+       8  CS_turnOffSMCLK
+       6  CS_turnOffXT1
+       8  CS_turnOnSMCLK
+       2  CS_turnOnXT1HF
+       4  CS_turnOnXT1HFWithTimeout
+      48  CS_turnOnXT1LF
+      62  CS_turnOnXT1LFWithTimeout
+     170  privateCSComputeCLKFrequency
+     356  privateCSComputeDCOFTrim
+     152  privateCSSourceClockFromDCO
+     126  privateDCORange
+       4  privateXT1ClockFrequency
+
+ 
+ 2 234 bytes in segment CODE
+     4 bytes in segment DATA16_Z
+ 
+ 2 234 bytes of CODE memory
+     4 bytes of DATA memory
+
+Errors: none
+Warnings: none

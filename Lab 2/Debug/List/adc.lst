@@ -1,0 +1,328 @@
+###############################################################################
+#
+# IAR C/C++ Compiler V7.12.3.989/W32 for MSP430           14/Nov/2019  10:44:41
+# Copyright 1996-2019 IAR Systems AB.
+# PC-locked license - IAR Embedded Workbench for Texas Instruments MSP430, 8K KickStart Edition 7.12
+#
+#    __rt_version  =  3
+#    __double_size =  32
+#    __reg_r4      =  free
+#    __reg_r5      =  free
+#    __pic         =  no
+#    __core        =  430X
+#    __data_model  =  small
+#    __code_model  =  large
+#    Source file   =  H:\Year 3\EE312\driverlib\MSP430FR2xx_4xx\adc.c
+#    Command line  =  
+#        -f C:\Users\rjb17150\AppData\Local\Temp\EWC763.tmp ("H:\Year
+#        3\EE312\driverlib\MSP430FR2xx_4xx\adc.c" -lcN "H:\Year 3\EE312\Lab
+#        2\Debug\List" -o "H:\Year 3\EE312\Lab 2\Debug\Obj" --no_cse
+#        --no_unroll --no_inline --no_code_motion --no_tbaa --debug
+#        -D__MSP430FR4133__ -e --double=32 --dlib_config "C:\Program Files
+#        (x86)\IAR Systems\Embedded Workbench 8.0\430\lib\dlib\dl430xlsfn.h" -I
+#        "H:\Year 3\EE312\Lab 2\..\" -I "H:\Year 3\EE312\Lab
+#        2\..\driverlib\MSP430FR2xx_4xx\" --core=430X --data_model=small -Ol
+#        --hw_workaround=CPU40 --code_model=large)
+#    Locale        =  English_GBR.1252
+#    List file     =  H:\Year 3\EE312\Lab 2\Debug\List\adc.lst
+#    Object file   =  H:\Year 3\EE312\Lab 2\Debug\Obj\adc.r43
+#
+###############################################################################
+
+H:\Year 3\EE312\driverlib\MSP430FR2xx_4xx\adc.c
+      1          /* --COPYRIGHT--,BSD
+      2           * Copyright (c) 2017, Texas Instruments Incorporated
+      3           * All rights reserved.
+      4           *
+      5           * Redistribution and use in source and binary forms, with or without
+      6           * modification, are permitted provided that the following conditions
+      7           * are met:
+      8           *
+      9           * *  Redistributions of source code must retain the above copyright
+     10           *    notice, this list of conditions and the following disclaimer.
+     11           *
+     12           * *  Redistributions in binary form must reproduce the above copyright
+     13           *    notice, this list of conditions and the following disclaimer in the
+     14           *    documentation and/or other materials provided with the distribution.
+     15           *
+     16           * *  Neither the name of Texas Instruments Incorporated nor the names of
+     17           *    its contributors may be used to endorse or promote products derived
+     18           *    from this software without specific prior written permission.
+     19           *
+     20           * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+     21           * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+     22           * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+     23           * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+     24           * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+     25           * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+     26           * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+     27           * OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+     28           * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+     29           * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
+     30           * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+     31           * --/COPYRIGHT--*/
+     32          //*****************************************************************************
+     33          //
+     34          // adc.c - Driver for the adc Module.
+     35          //
+     36          //*****************************************************************************
+     37          
+     38          //*****************************************************************************
+     39          //
+     40          //! \addtogroup adc_api adc
+     41          //! @{
+     42          //
+     43          //*****************************************************************************
+     44          
+     45          #include "inc/hw_memmap.h"
+     46          
+     47          #ifdef __MSP430_HAS_ADC__
+     48          #include "adc.h"
+     49          
+     50          #include <assert.h>
+     51          
+     52          void ADC_init(uint16_t baseAddress,
+     53              uint16_t sampleHoldSignalSourceSelect,
+     54              uint8_t clockSourceSelect,
+     55              uint16_t clockSourceDivider)
+     56          {
+     57              //Turn OFF ADC Module & Clear Interrupt Registers
+     58              HWREG16(baseAddress + OFS_ADCCTL0) &= ~(ADCON + ADCENC + ADCSC);
+     59              HWREG16(baseAddress + OFS_ADCIE)  &= 0x0000; //Reset ALL interrupt enables
+     60              HWREG16(baseAddress + OFS_ADCIFG) &= 0x0000; //Reset ALL interrupt flags
+     61          
+     62              //Set ADC Control 1
+     63              HWREG16(baseAddress + OFS_ADCCTL1) = sampleHoldSignalSourceSelect //Setup the Sample-and-Hold Source
+     64                  + (clockSourceDivider & ADCDIV_7)  //Set Clock Divider
+     65                  + clockSourceSelect; //Setup Clock Source
+     66          
+     67              //Set ADC Control 2
+     68              HWREG16(baseAddress + OFS_ADCCTL2) = (clockSourceDivider & ADCPDIV_3) //Set Clock Pre-Divider
+     69                  + ADCRES_1; //Default resolution to 10-bits
+     70          }
+     71          
+     72          void ADC_enable(uint16_t baseAddress)
+     73          {
+     74              //Reset the ADCON bit to enable the ADC Module
+     75              HWREG16(baseAddress + OFS_ADCCTL0) |= ADCON;
+     76          }
+     77          
+     78          void ADC_disable(uint16_t baseAddress)
+     79          {
+     80              //Set the ADCON bit to disable the ADC Module
+     81              HWREG16(baseAddress + OFS_ADCCTL0) &= ~ADCON;
+     82          }
+     83          
+     84          void ADC_setupSamplingTimer(uint16_t baseAddress,
+     85              uint16_t clockCycleHoldCount,
+     86              uint16_t multipleSamplesEnabled)
+     87          {
+     88              HWREG16(baseAddress + OFS_ADCCTL1) |= ADCSHP;
+     89          
+     90              //Reset and Set CB Control 0 Bits
+     91              HWREG16(baseAddress + OFS_ADCCTL0) &= ~(ADCSHT_15 + ADCMSC);
+     92              HWREG16(baseAddress + OFS_ADCCTL0) |= clockCycleHoldCount + multipleSamplesEnabled;
+     93          }
+     94          
+     95          void ADC_disableSamplingTimer(uint16_t baseAddress)
+     96          {
+     97              HWREG16(baseAddress + OFS_ADCCTL1) &= ~(ADCSHP);
+     98          }
+     99          
+    100          void ADC_configureMemory(uint16_t baseAddress,
+    101              uint8_t inputSourceSelect,
+    102              uint8_t positiveRefVoltageSourceSelect,
+    103              uint8_t negativeRefVoltageSourceSelect)
+    104          {
+    105          
+    106              //Make sure the ENC bit is cleared before configuring a Memory Buffer Control
+    107              assert( !(HWREG16(baseAddress + OFS_ADCCTL0) & ADCENC) );
+    108          
+    109              if(!(HWREG16(baseAddress + OFS_ADCCTL0) & ADCENC))
+    110              {
+    111          #ifdef ADCPCTL9
+    112                  //Enable ADC input pin
+    113                  if(inputSourceSelect < ADCINCH_10)
+    114                  {
+    115                      HWREG16(SYS_BASE + OFS_SYSCFG2) |= (1 << inputSourceSelect);
+    116                  }
+    117          #elif ADCPCTL7
+    118                  if(inputSourceSelect < ADCINCH_8)
+    119                  {
+    120                      HWREG16(SYS_BASE + OFS_SYSCFG2) |= (1 << inputSourceSelect);
+    121                  }
+    122          #endif
+    123          
+    124                  //Reset and Set the Memory Buffer Control Bits
+    125                  HWREG16(baseAddress + OFS_ADCMCTL0) = inputSourceSelect + positiveRefVoltageSourceSelect
+    126                      + negativeRefVoltageSourceSelect;
+    127              }
+    128          }
+    129          
+    130          void ADC_enableInterrupt(uint16_t baseAddress,
+    131              uint16_t interruptMask)
+    132          {
+    133              HWREG16(baseAddress + OFS_ADCIE) |= interruptMask;
+    134          }
+    135          
+    136          void ADC_disableInterrupt(uint16_t baseAddress,
+    137              uint16_t interruptMask)
+    138          {
+    139              HWREG16(baseAddress + OFS_ADCIE) &= ~(interruptMask);
+    140          }
+    141          
+    142          void ADC_clearInterrupt(uint16_t baseAddress,
+    143              uint16_t interruptFlagMask)
+    144          {
+    145              HWREG16(baseAddress + OFS_ADCIFG) &= ~(interruptFlagMask);
+    146          }
+    147          
+    148          uint8_t ADC_getInterruptStatus(uint16_t baseAddress,
+    149              uint8_t interruptFlagMask)
+    150          {
+    151              return (HWREG16(baseAddress + OFS_ADCIFG) & interruptFlagMask);
+    152          }
+    153          
+    154          void ADC_startConversion(uint16_t baseAddress,
+    155              uint16_t conversionSequenceModeSelect)
+    156          {
+    157              //Reset the ENC bit to set the conversion mode sequence
+    158              HWREG16(baseAddress + OFS_ADCCTL0) &= ~(ADCENC);
+    159          
+    160              HWREG16(baseAddress + OFS_ADCCTL1) &= ~ADCCONSEQ;
+    161              HWREG16(baseAddress + OFS_ADCCTL1) |= conversionSequenceModeSelect;
+    162              HWREG16(baseAddress + OFS_ADCCTL0) |= ADCENC | ADCSC;
+    163          }
+    164          
+    165          void ADC_disableConversions(uint16_t baseAddress,
+    166              bool preempt)
+    167          {
+    168              if (!preempt) {
+    169                  if (!(HWREG16(baseAddress + OFS_ADCCTL1) & ADCCONSEQ_3)) {
+    170                      //To prevent preemption of a single-channel, single-conversion we must
+    171                      //wait for the ADC core to finish the conversion.
+    172                      while (HWREG16(baseAddress + OFS_ADCCTL1) & ADCBUSY);
+    173                  }
+    174              }
+    175          
+    176              HWREG16(baseAddress + OFS_ADCCTL0) &= ~(ADCENC);
+    177              HWREG16(baseAddress + OFS_ADCCTL1) &= ~(ADCCONSEQ_3);
+    178          }
+    179          
+    180          int16_t ADC_getResults(uint16_t baseAddress)
+    181          {
+    182              return (int16_t)(HWREG16(baseAddress + OFS_ADCMEM0));
+    183          }
+    184          
+    185          void ADC_setResolution(uint16_t baseAddress,
+    186              uint16_t resolutionSelect)
+    187          {
+    188              HWREG16(baseAddress + OFS_ADCCTL2) &= ~(ADCRES);
+    189              HWREG16(baseAddress + OFS_ADCCTL2) |= resolutionSelect;
+    190          }
+    191          
+    192          void ADC_setSampleHoldSignalInversion(uint16_t baseAddress,
+    193              uint16_t invertedSignal)
+    194          {
+    195              HWREG16(baseAddress + OFS_ADCCTL1) &= ~(ADCISSH);
+    196              HWREG16(baseAddress + OFS_ADCCTL1) |= invertedSignal;
+    197          }
+    198          
+    199          void ADC_setDataReadBackFormat(uint16_t baseAddress,
+    200              uint16_t readBackFormat)
+    201          {
+    202              HWREG16(baseAddress + OFS_ADCCTL2) &= ~(ADCDF);
+    203              HWREG16(baseAddress + OFS_ADCCTL2) |= readBackFormat;
+    204          }
+    205          
+    206          void ADC_setReferenceBufferSamplingRate(uint16_t baseAddress,
+    207              uint16_t samplingRateSelect)
+    208          {
+    209              HWREG16(baseAddress + OFS_ADCCTL2) &= ~(ADCSR);
+    210              HWREG16(baseAddress + OFS_ADCCTL2) |= samplingRateSelect;
+    211          }
+    212          
+    213          void ADC_setWindowComp(uint16_t baseAddress,
+    214              uint16_t highThreshold,
+    215              uint16_t lowThreshold)
+    216          {
+    217              HWREG16(baseAddress + OFS_ADCHI) = highThreshold;
+    218              HWREG16(baseAddress + OFS_ADCLO) = lowThreshold;
+    219          }
+    220          
+    221          uint32_t ADC_getMemoryAddressForDMA(uint16_t baseAddress)
+    222          {
+    223              return (baseAddress + OFS_ADCMEM0);
+    224          }
+    225          
+    226          uint8_t ADC_isBusy(uint16_t baseAddress)
+    227          {
+    228              return (HWREG16(baseAddress + OFS_ADCCTL1) & ADCBUSY);
+    229          }
+    230          
+    231          #endif
+    232          //*****************************************************************************
+    233          //
+    234          //! Close the doxygen group for adc_api
+    235          //! @}
+    236          //
+    237          //*****************************************************************************
+
+   Maximum stack usage in bytes:
+
+   CSTACK Function
+   ------ --------
+      4   ADC_clearInterrupt
+      6   ADC_configureMemory
+      4   ADC_disable
+      4   ADC_disableConversions
+      4   ADC_disableInterrupt
+      4   ADC_disableSamplingTimer
+      4   ADC_enable
+      4   ADC_enableInterrupt
+      4   ADC_getInterruptStatus
+      4   ADC_getMemoryAddressForDMA
+      4   ADC_getResults
+     12   ADC_init
+      4   ADC_isBusy
+      4   ADC_setDataReadBackFormat
+      4   ADC_setReferenceBufferSamplingRate
+      4   ADC_setResolution
+      4   ADC_setSampleHoldSignalInversion
+      4   ADC_setWindowComp
+      4   ADC_setupSamplingTimer
+      4   ADC_startConversion
+
+
+   Segment part sizes:
+
+   Bytes  Function/Label
+   -----  --------------
+      10  ADC_clearInterrupt
+      56  ADC_configureMemory
+       8  ADC_disable
+      42  ADC_disableConversions
+      10  ADC_disableInterrupt
+      10  ADC_disableSamplingTimer
+       8  ADC_enable
+      10  ADC_enableInterrupt
+      10  ADC_getInterruptStatus
+       8  ADC_getMemoryAddressForDMA
+       8  ADC_getResults
+      84  ADC_init
+       8  ADC_isBusy
+      16  ADC_setDataReadBackFormat
+      16  ADC_setReferenceBufferSamplingRate
+      18  ADC_setResolution
+      18  ADC_setSampleHoldSignalInversion
+      18  ADC_setWindowComp
+      24  ADC_setupSamplingTimer
+      32  ADC_startConversion
+
+ 
+ 414 bytes in segment CODE
+ 
+ 414 bytes of CODE memory
+
+Errors: none
+Warnings: none

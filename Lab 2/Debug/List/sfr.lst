@@ -1,0 +1,161 @@
+###############################################################################
+#
+# IAR C/C++ Compiler V7.12.3.989/W32 for MSP430           14/Nov/2019  10:44:44
+# Copyright 1996-2019 IAR Systems AB.
+# PC-locked license - IAR Embedded Workbench for Texas Instruments MSP430, 8K KickStart Edition 7.12
+#
+#    __rt_version  =  3
+#    __double_size =  32
+#    __reg_r4      =  free
+#    __reg_r5      =  free
+#    __pic         =  no
+#    __core        =  430X
+#    __data_model  =  small
+#    __code_model  =  large
+#    Source file   =  H:\Year 3\EE312\driverlib\MSP430FR2xx_4xx\sfr.c
+#    Command line  =  
+#        -f C:\Users\rjb17150\AppData\Local\Temp\EWD106.tmp ("H:\Year
+#        3\EE312\driverlib\MSP430FR2xx_4xx\sfr.c" -lcN "H:\Year 3\EE312\Lab
+#        2\Debug\List" -o "H:\Year 3\EE312\Lab 2\Debug\Obj" --no_cse
+#        --no_unroll --no_inline --no_code_motion --no_tbaa --debug
+#        -D__MSP430FR4133__ -e --double=32 --dlib_config "C:\Program Files
+#        (x86)\IAR Systems\Embedded Workbench 8.0\430\lib\dlib\dl430xlsfn.h" -I
+#        "H:\Year 3\EE312\Lab 2\..\" -I "H:\Year 3\EE312\Lab
+#        2\..\driverlib\MSP430FR2xx_4xx\" --core=430X --data_model=small -Ol
+#        --hw_workaround=CPU40 --code_model=large)
+#    Locale        =  English_GBR.1252
+#    List file     =  H:\Year 3\EE312\Lab 2\Debug\List\sfr.lst
+#    Object file   =  H:\Year 3\EE312\Lab 2\Debug\Obj\sfr.r43
+#
+###############################################################################
+
+H:\Year 3\EE312\driverlib\MSP430FR2xx_4xx\sfr.c
+      1          /* --COPYRIGHT--,BSD
+      2           * Copyright (c) 2017, Texas Instruments Incorporated
+      3           * All rights reserved.
+      4           *
+      5           * Redistribution and use in source and binary forms, with or without
+      6           * modification, are permitted provided that the following conditions
+      7           * are met:
+      8           *
+      9           * *  Redistributions of source code must retain the above copyright
+     10           *    notice, this list of conditions and the following disclaimer.
+     11           *
+     12           * *  Redistributions in binary form must reproduce the above copyright
+     13           *    notice, this list of conditions and the following disclaimer in the
+     14           *    documentation and/or other materials provided with the distribution.
+     15           *
+     16           * *  Neither the name of Texas Instruments Incorporated nor the names of
+     17           *    its contributors may be used to endorse or promote products derived
+     18           *    from this software without specific prior written permission.
+     19           *
+     20           * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+     21           * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+     22           * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+     23           * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+     24           * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+     25           * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+     26           * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+     27           * OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+     28           * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+     29           * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
+     30           * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+     31           * --/COPYRIGHT--*/
+     32          //*****************************************************************************
+     33          //
+     34          // sfr.c - Driver for the sfr Module.
+     35          //
+     36          //*****************************************************************************
+     37          
+     38          //*****************************************************************************
+     39          //
+     40          //! \addtogroup sfr_api sfr
+     41          //! @{
+     42          //
+     43          //*****************************************************************************
+     44          
+     45          #include "inc/hw_memmap.h"
+     46          
+     47          #ifdef __MSP430_HAS_SFR__
+     48          #include "sfr.h"
+     49          
+     50          #include <assert.h>
+     51          
+     52          void SFR_enableInterrupt (uint8_t interruptMask)
+     53          {
+     54              HWREG8(SFR_BASE + OFS_SFRIE1_L) |= interruptMask;
+     55          }
+     56          
+     57          void SFR_disableInterrupt (uint8_t interruptMask)
+     58          {
+     59              HWREG8(SFR_BASE + OFS_SFRIE1_L) &= ~(interruptMask);
+     60          }
+     61          
+     62          uint8_t SFR_getInterruptStatus (uint8_t interruptFlagMask)
+     63          {
+     64              return ( HWREG8(SFR_BASE + OFS_SFRIFG1_L) & interruptFlagMask );
+     65          }
+     66          
+     67          void SFR_clearInterrupt (uint8_t interruptFlagMask)
+     68          {
+     69              HWREG8(SFR_BASE + OFS_SFRIFG1_L) &= ~(interruptFlagMask);
+     70          }
+     71          
+     72          void SFR_setResetPinPullResistor (uint16_t pullResistorSetup)
+     73          {
+     74              HWREG8(SFR_BASE + OFS_SFRRPCR_L) &= ~(SYSRSTRE + SYSRSTUP);
+     75              HWREG8(SFR_BASE + OFS_SFRRPCR_L) |= pullResistorSetup;
+     76          }
+     77          
+     78          void SFR_setNMIEdge (uint16_t edgeDirection)
+     79          {
+     80              HWREG8(SFR_BASE + OFS_SFRRPCR_L) &= ~(SYSNMIIES);
+     81              HWREG8(SFR_BASE + OFS_SFRRPCR_L) |= edgeDirection;
+     82          }
+     83          
+     84          void SFR_setResetNMIPinFunction (uint8_t resetPinFunction)
+     85          {
+     86              HWREG8(SFR_BASE + OFS_SFRRPCR_L) &= ~(SYSNMI);
+     87              HWREG8(SFR_BASE + OFS_SFRRPCR_L) |= resetPinFunction;
+     88          }
+     89          
+     90          #endif
+     91          //*****************************************************************************
+     92          //
+     93          //! Close the doxygen group for sfr_api
+     94          //! @}
+     95          //
+     96          //*****************************************************************************
+
+   Maximum stack usage in bytes:
+
+   CSTACK Function
+   ------ --------
+      4   SFR_clearInterrupt
+      4   SFR_disableInterrupt
+      4   SFR_enableInterrupt
+      4   SFR_getInterruptStatus
+      4   SFR_setNMIEdge
+      4   SFR_setResetNMIPinFunction
+      4   SFR_setResetPinPullResistor
+
+
+   Segment part sizes:
+
+   Bytes  Function/Label
+   -----  --------------
+       6  SFR_clearInterrupt
+       6  SFR_disableInterrupt
+       6  SFR_enableInterrupt
+       6  SFR_getInterruptStatus
+      10  SFR_setNMIEdge
+      10  SFR_setResetNMIPinFunction
+      12  SFR_setResetPinPullResistor
+
+ 
+ 56 bytes in segment CODE
+ 
+ 56 bytes of CODE memory
+
+Errors: none
+Warnings: none

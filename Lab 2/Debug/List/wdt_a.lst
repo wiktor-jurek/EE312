@@ -1,0 +1,163 @@
+###############################################################################
+#
+# IAR C/C++ Compiler V7.12.3.989/W32 for MSP430           14/Nov/2019  10:44:44
+# Copyright 1996-2019 IAR Systems AB.
+# PC-locked license - IAR Embedded Workbench for Texas Instruments MSP430, 8K KickStart Edition 7.12
+#
+#    __rt_version  =  3
+#    __double_size =  32
+#    __reg_r4      =  free
+#    __reg_r5      =  free
+#    __pic         =  no
+#    __core        =  430X
+#    __data_model  =  small
+#    __code_model  =  large
+#    Source file   =  H:\Year 3\EE312\driverlib\MSP430FR2xx_4xx\wdt_a.c
+#    Command line  =  
+#        -f C:\Users\rjb17150\AppData\Local\Temp\EWD33C.tmp ("H:\Year
+#        3\EE312\driverlib\MSP430FR2xx_4xx\wdt_a.c" -lcN "H:\Year 3\EE312\Lab
+#        2\Debug\List" -o "H:\Year 3\EE312\Lab 2\Debug\Obj" --no_cse
+#        --no_unroll --no_inline --no_code_motion --no_tbaa --debug
+#        -D__MSP430FR4133__ -e --double=32 --dlib_config "C:\Program Files
+#        (x86)\IAR Systems\Embedded Workbench 8.0\430\lib\dlib\dl430xlsfn.h" -I
+#        "H:\Year 3\EE312\Lab 2\..\" -I "H:\Year 3\EE312\Lab
+#        2\..\driverlib\MSP430FR2xx_4xx\" --core=430X --data_model=small -Ol
+#        --hw_workaround=CPU40 --code_model=large)
+#    Locale        =  English_GBR.1252
+#    List file     =  H:\Year 3\EE312\Lab 2\Debug\List\wdt_a.lst
+#    Object file   =  H:\Year 3\EE312\Lab 2\Debug\Obj\wdt_a.r43
+#
+###############################################################################
+
+H:\Year 3\EE312\driverlib\MSP430FR2xx_4xx\wdt_a.c
+      1          /* --COPYRIGHT--,BSD
+      2           * Copyright (c) 2017, Texas Instruments Incorporated
+      3           * All rights reserved.
+      4           *
+      5           * Redistribution and use in source and binary forms, with or without
+      6           * modification, are permitted provided that the following conditions
+      7           * are met:
+      8           *
+      9           * *  Redistributions of source code must retain the above copyright
+     10           *    notice, this list of conditions and the following disclaimer.
+     11           *
+     12           * *  Redistributions in binary form must reproduce the above copyright
+     13           *    notice, this list of conditions and the following disclaimer in the
+     14           *    documentation and/or other materials provided with the distribution.
+     15           *
+     16           * *  Neither the name of Texas Instruments Incorporated nor the names of
+     17           *    its contributors may be used to endorse or promote products derived
+     18           *    from this software without specific prior written permission.
+     19           *
+     20           * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+     21           * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+     22           * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+     23           * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+     24           * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+     25           * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+     26           * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+     27           * OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+     28           * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+     29           * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
+     30           * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+     31           * --/COPYRIGHT--*/
+     32          //*****************************************************************************
+     33          //
+     34          // wdt_a.c - Driver for the wdt_a Module.
+     35          //
+     36          //*****************************************************************************
+     37          
+     38          //*****************************************************************************
+     39          //
+     40          //! \addtogroup wdt_a_api wdt_a
+     41          //! @{
+     42          //
+     43          //*****************************************************************************
+     44          
+     45          #include "inc/hw_memmap.h"
+     46          
+     47          #ifdef __MSP430_HAS_WDT_A__
+     48          #include "wdt_a.h"
+     49          
+     50          #include <assert.h>
+     51          
+     52          void WDT_A_hold (uint16_t baseAddress)
+     53          {
+     54              // Set Hold bit
+     55              uint8_t newWDTStatus =
+     56                  ((HWREG16(baseAddress + OFS_WDTCTL) & 0x00FF) | WDTHOLD);
+     57          
+     58              HWREG16(baseAddress + OFS_WDTCTL) = WDTPW + newWDTStatus;
+     59          }
+     60          
+     61          void WDT_A_start (uint16_t baseAddress)
+     62          {
+     63              // Reset Hold bit
+     64              uint8_t newWDTStatus =
+     65                  ((HWREG16(baseAddress + OFS_WDTCTL) & 0x00FF) & ~(WDTHOLD));
+     66          
+     67              HWREG16(baseAddress + OFS_WDTCTL) = WDTPW + newWDTStatus;
+     68          }
+     69          
+     70          void WDT_A_resetTimer (uint16_t baseAddress)
+     71          {
+     72              // Set Counter Clear bit
+     73              uint8_t newWDTStatus =
+     74                  ((HWREG16(baseAddress + OFS_WDTCTL) & 0x00FF) | WDTCNTCL);
+     75          
+     76              HWREG16(baseAddress + OFS_WDTCTL) = WDTPW + newWDTStatus;
+     77          }
+     78          
+     79          void WDT_A_initWatchdogTimer (uint16_t baseAddress,
+     80              uint8_t clockSelect,
+     81              uint8_t clockDivider)
+     82          {
+     83              HWREG16(baseAddress + OFS_WDTCTL) =
+     84                  WDTPW + WDTCNTCL + WDTHOLD + clockSelect + clockDivider;
+     85          }
+     86          
+     87          void WDT_A_initIntervalTimer (uint16_t baseAddress,
+     88              uint8_t clockSelect,
+     89              uint8_t clockDivider)
+     90          {
+     91              HWREG16(baseAddress + OFS_WDTCTL) =
+     92                  WDTPW + WDTCNTCL + WDTHOLD + WDTTMSEL + clockSelect + clockDivider;
+     93          }
+     94          
+     95          
+     96          #endif
+     97          //*****************************************************************************
+     98          //
+     99          //! Close the doxygen group for wdt_a_api
+    100          //! @}
+    101          //
+    102          //*****************************************************************************
+
+   Maximum stack usage in bytes:
+
+   CSTACK Function
+   ------ --------
+      4   WDT_A_hold
+      4   WDT_A_initIntervalTimer
+      4   WDT_A_initWatchdogTimer
+      4   WDT_A_resetTimer
+      4   WDT_A_start
+
+
+   Segment part sizes:
+
+   Bytes  Function/Label
+   -----  --------------
+      18  WDT_A_hold
+      16  WDT_A_initIntervalTimer
+      16  WDT_A_initWatchdogTimer
+      16  WDT_A_resetTimer
+      18  WDT_A_start
+
+ 
+ 84 bytes in segment CODE
+ 
+ 84 bytes of CODE memory
+
+Errors: none
+Warnings: none

@@ -1,0 +1,200 @@
+###############################################################################
+#
+# IAR C/C++ Compiler V7.12.3.989/W32 for MSP430           14/Nov/2019  10:44:43
+# Copyright 1996-2019 IAR Systems AB.
+# PC-locked license - IAR Embedded Workbench for Texas Instruments MSP430, 8K KickStart Edition 7.12
+#
+#    __rt_version  =  3
+#    __double_size =  32
+#    __reg_r4      =  free
+#    __reg_r5      =  free
+#    __pic         =  no
+#    __core        =  430X
+#    __data_model  =  small
+#    __code_model  =  large
+#    Source file   =  H:\Year 3\EE312\driverlib\MSP430FR2xx_4xx\rtc.c
+#    Command line  =  
+#        -f C:\Users\rjb17150\AppData\Local\Temp\EWD0A7.tmp ("H:\Year
+#        3\EE312\driverlib\MSP430FR2xx_4xx\rtc.c" -lcN "H:\Year 3\EE312\Lab
+#        2\Debug\List" -o "H:\Year 3\EE312\Lab 2\Debug\Obj" --no_cse
+#        --no_unroll --no_inline --no_code_motion --no_tbaa --debug
+#        -D__MSP430FR4133__ -e --double=32 --dlib_config "C:\Program Files
+#        (x86)\IAR Systems\Embedded Workbench 8.0\430\lib\dlib\dl430xlsfn.h" -I
+#        "H:\Year 3\EE312\Lab 2\..\" -I "H:\Year 3\EE312\Lab
+#        2\..\driverlib\MSP430FR2xx_4xx\" --core=430X --data_model=small -Ol
+#        --hw_workaround=CPU40 --code_model=large)
+#    Locale        =  English_GBR.1252
+#    List file     =  H:\Year 3\EE312\Lab 2\Debug\List\rtc.lst
+#    Object file   =  H:\Year 3\EE312\Lab 2\Debug\Obj\rtc.r43
+#
+###############################################################################
+
+H:\Year 3\EE312\driverlib\MSP430FR2xx_4xx\rtc.c
+      1          /* --COPYRIGHT--,BSD
+      2           * Copyright (c) 2017, Texas Instruments Incorporated
+      3           * All rights reserved.
+      4           *
+      5           * Redistribution and use in source and binary forms, with or without
+      6           * modification, are permitted provided that the following conditions
+      7           * are met:
+      8           *
+      9           * *  Redistributions of source code must retain the above copyright
+     10           *    notice, this list of conditions and the following disclaimer.
+     11           *
+     12           * *  Redistributions in binary form must reproduce the above copyright
+     13           *    notice, this list of conditions and the following disclaimer in the
+     14           *    documentation and/or other materials provided with the distribution.
+     15           *
+     16           * *  Neither the name of Texas Instruments Incorporated nor the names of
+     17           *    its contributors may be used to endorse or promote products derived
+     18           *    from this software without specific prior written permission.
+     19           *
+     20           * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+     21           * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+     22           * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+     23           * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+     24           * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+     25           * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+     26           * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+     27           * OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+     28           * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+     29           * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
+     30           * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+     31           * --/COPYRIGHT--*/
+     32          //*****************************************************************************
+     33          //
+     34          // rtc.c - Driver for the rtc Module.
+     35          //
+     36          //*****************************************************************************
+     37          
+     38          //*****************************************************************************
+     39          //
+     40          //! \addtogroup rtc_api rtc
+     41          //! @{
+     42          //
+     43          //*****************************************************************************
+     44          
+     45          #include "inc/hw_memmap.h"
+     46          
+     47          #ifdef __MSP430_HAS_RTC__
+     48          #include "rtc.h"
+     49          
+     50          #include <assert.h>
+     51          
+     52          void RTC_init(uint16_t baseAddress,
+     53              uint16_t modulo,
+     54              uint16_t clockPredivider)
+     55          {
+     56              HWREG16(baseAddress + OFS_RTCCTL) &= ~(RTCSS_3 | RTCPS_7);
+     57              
+     58              HWREG16(baseAddress + OFS_RTCMOD) = modulo;
+     59              HWREG16(baseAddress + OFS_RTCCTL) |= clockPredivider;
+     60          }
+     61          
+     62          void RTC_start(uint16_t baseAddress, uint16_t clockSource)
+     63          {
+     64              HWREG16(baseAddress + OFS_RTCCTL) &= ~RTCSS_3;
+     65          
+     66          #ifdef RTCCKSEL
+     67              HWREG16(SYS_BASE + OFS_SYSCFG2) &= ~RTCCKSEL;
+     68              if (clockSource == RTC_CLOCKSOURCE_ACLK) {
+     69                  HWREG16(SYS_BASE + OFS_SYSCFG2) |= RTCCKSEL;
+     70                  HWREG16(baseAddress + OFS_RTCCTL) |= RTCSS_1;
+     71              }
+     72              else {
+     73                  HWREG16(baseAddress + OFS_RTCCTL) |= clockSource;
+     74              }
+     75          #else
+     76              HWREG16(baseAddress + OFS_RTCCTL) |= clockSource;
+     77          #endif
+     78          
+     79              HWREG16(baseAddress + OFS_RTCCTL) |= RTCSR;
+     80          }
+     81          
+     82          void RTC_stop(uint16_t baseAddress)
+     83          {
+     84              HWREG16(baseAddress + OFS_RTCCTL) &= ~RTCSS_3;
+     85          }
+     86          
+     87          void RTC_setModulo(uint16_t baseAddress,
+     88              uint16_t modulo)
+     89          {
+     90              HWREG16(baseAddress + OFS_RTCMOD) = modulo;
+     91          }
+     92          
+     93          void RTC_enableInterrupt(uint16_t baseAddress,
+     94              uint8_t interruptMask)
+     95          {
+     96              if (interruptMask & RTCIE) {
+     97                  HWREG16(baseAddress + OFS_RTCCTL) |= RTCIE;
+     98              }
+     99          }
+    100          
+    101          void RTC_disableInterrupt(uint16_t baseAddress,
+    102              uint8_t interruptMask)
+    103          {
+    104              if (interruptMask & RTCIE) {
+    105                  HWREG16(baseAddress + OFS_RTCCTL) &= ~RTCIE;
+    106              }
+    107          }
+    108          
+    109          uint8_t RTC_getInterruptStatus(uint16_t baseAddress,
+    110              uint8_t interruptFlagMask) 
+    111          {
+    112              uint8_t intStatus = 0;
+    113              
+    114              if (interruptFlagMask & RTCIF) {
+    115                  intStatus = (uint8_t)(HWREG16(baseAddress + OFS_RTCCTL) & RTCIF);
+    116              }
+    117              
+    118              return intStatus;
+    119          }
+    120          
+    121          void RTC_clearInterrupt(uint16_t baseAddress,
+    122              int8_t interruptFlagMask)
+    123          {
+    124              HWREG16(baseAddress + OFS_RTCCTL) &= ~RTCIF;
+    125          }
+    126          
+    127          #endif
+    128          //*****************************************************************************
+    129          //
+    130          //! Close the doxygen group for rtc_api
+    131          //! @}
+    132          //
+    133          //*****************************************************************************
+
+   Maximum stack usage in bytes:
+
+   CSTACK Function
+   ------ --------
+      4   RTC_clearInterrupt
+      4   RTC_disableInterrupt
+      4   RTC_enableInterrupt
+      4   RTC_getInterruptStatus
+      4   RTC_init
+      4   RTC_setModulo
+      4   RTC_start
+      4   RTC_stop
+
+
+   Segment part sizes:
+
+   Bytes  Function/Label
+   -----  --------------
+       6  RTC_clearInterrupt
+      10  RTC_disableInterrupt
+      10  RTC_enableInterrupt
+      14  RTC_getInterruptStatus
+      20  RTC_init
+       8  RTC_setModulo
+      18  RTC_start
+       8  RTC_stop
+
+ 
+ 94 bytes in segment CODE
+ 
+ 94 bytes of CODE memory
+
+Errors: none
+Warnings: none

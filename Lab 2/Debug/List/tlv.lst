@@ -1,0 +1,313 @@
+###############################################################################
+#
+# IAR C/C++ Compiler V7.12.3.989/W32 for MSP430           14/Nov/2019  10:44:44
+# Copyright 1996-2019 IAR Systems AB.
+# PC-locked license - IAR Embedded Workbench for Texas Instruments MSP430, 8K KickStart Edition 7.12
+#
+#    __rt_version  =  3
+#    __double_size =  32
+#    __reg_r4      =  free
+#    __reg_r5      =  free
+#    __pic         =  no
+#    __core        =  430X
+#    __data_model  =  small
+#    __code_model  =  large
+#    Source file   =  H:\Year 3\EE312\driverlib\MSP430FR2xx_4xx\tlv.c
+#    Command line  =  
+#        -f C:\Users\rjb17150\AppData\Local\Temp\EWD2CE.tmp ("H:\Year
+#        3\EE312\driverlib\MSP430FR2xx_4xx\tlv.c" -lcN "H:\Year 3\EE312\Lab
+#        2\Debug\List" -o "H:\Year 3\EE312\Lab 2\Debug\Obj" --no_cse
+#        --no_unroll --no_inline --no_code_motion --no_tbaa --debug
+#        -D__MSP430FR4133__ -e --double=32 --dlib_config "C:\Program Files
+#        (x86)\IAR Systems\Embedded Workbench 8.0\430\lib\dlib\dl430xlsfn.h" -I
+#        "H:\Year 3\EE312\Lab 2\..\" -I "H:\Year 3\EE312\Lab
+#        2\..\driverlib\MSP430FR2xx_4xx\" --core=430X --data_model=small -Ol
+#        --hw_workaround=CPU40 --code_model=large)
+#    Locale        =  English_GBR.1252
+#    List file     =  H:\Year 3\EE312\Lab 2\Debug\List\tlv.lst
+#    Object file   =  H:\Year 3\EE312\Lab 2\Debug\Obj\tlv.r43
+#
+###############################################################################
+
+H:\Year 3\EE312\driverlib\MSP430FR2xx_4xx\tlv.c
+      1          /* --COPYRIGHT--,BSD
+      2           * Copyright (c) 2017, Texas Instruments Incorporated
+      3           * All rights reserved.
+      4           *
+      5           * Redistribution and use in source and binary forms, with or without
+      6           * modification, are permitted provided that the following conditions
+      7           * are met:
+      8           *
+      9           * *  Redistributions of source code must retain the above copyright
+     10           *    notice, this list of conditions and the following disclaimer.
+     11           *
+     12           * *  Redistributions in binary form must reproduce the above copyright
+     13           *    notice, this list of conditions and the following disclaimer in the
+     14           *    documentation and/or other materials provided with the distribution.
+     15           *
+     16           * *  Neither the name of Texas Instruments Incorporated nor the names of
+     17           *    its contributors may be used to endorse or promote products derived
+     18           *    from this software without specific prior written permission.
+     19           *
+     20           * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+     21           * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+     22           * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+     23           * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+     24           * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+     25           * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+     26           * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+     27           * OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+     28           * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+     29           * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
+     30           * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+     31           * --/COPYRIGHT--*/
+     32          //*****************************************************************************
+     33          //
+     34          // tlv.c - Driver for the tlv Module.
+     35          //
+     36          //*****************************************************************************
+     37          
+     38          //*****************************************************************************
+     39          //
+     40          //! \addtogroup tlv_api tlv
+     41          //! @{
+     42          //
+     43          //*****************************************************************************
+     44          
+     45          #include "inc/hw_memmap.h"
+     46          
+     47          #ifdef __MSP430_HAS_TLV__
+     48          #include "tlv.h"
+     49          
+     50          #include <assert.h>
+     51          
+     52          void TLV_getInfo(uint8_t tag,
+     53                  uint8_t instance,
+     54                  uint8_t *length,
+     55                  uint16_t **data_address
+     56                  )
+     57          {
+     58              // TLV Structure Start Address
+     59              char *TLV_address = (char *)TLV_START;
+     60          
+     61              while((TLV_address < (char *)TLV_END)
+     62                      && ((*TLV_address != tag) || instance)   // check for tag and instance
+     63                      && (*TLV_address != TLV_TAGEND))         // do range check first
+     64              {
+     65                  if (*TLV_address == tag)
+     66                  {
+     67                      // repeat till requested instance is reached
+     68                      instance--;
+     69                  }
+     70                  // add (Current TAG address + LENGTH) + 2
+     71                  TLV_address += *(TLV_address + 1) + 2;
+     72              }
+     73          
+     74              // Check if Tag match happened..
+     75              if (*TLV_address == tag)
+     76              {
+     77                  // Return length = Address + 1
+     78                  *length = *(TLV_address + 1);
+     79                  // Return address of first data/value info = Address + 2
+     80                  *data_address = (uint16_t *)(TLV_address + 2);
+     81              }
+     82              // If there was no tag match and the end of TLV structure was reached..
+     83              else
+     84              {
+     85                  // Return 0 for TAG not found
+     86                  *length = 0;
+     87                  // Return 0 for TAG not found
+     88                  *data_address = 0;
+     89              }
+     90          }
+     91          
+     92          uint16_t TLV_getDeviceType()
+     93          {
+     94              uint16_t *pDeviceType = (uint16_t *)TLV_DEVICE_ID_0;
+     95              // Return Value from TLV Table
+     96              return pDeviceType[0];
+     97          }
+     98          
+     99          uint16_t TLV_getMemory(uint8_t instance)
+    100          {
+    101              uint8_t *pPDTAG;
+    102              uint8_t bPDTAG_bytes;
+    103              uint16_t count;
+    104          
+    105              // set tag for word access comparison
+    106              instance *= 2;
+    107          
+    108              // TLV access Function Call
+    109              // Get Peripheral data pointer
+    110              TLV_getInfo(TLV_PDTAG,
+    111                      0,
+    112                      &bPDTAG_bytes,
+    113                      (uint16_t **)&pPDTAG
+    114                      );
+    115              if (pPDTAG != 0)
+    116              {
+    117                  for (count = 0; count <= instance; count += 2)
+    118                  {
+    119                      if (pPDTAG[count] == 0)
+    120                      {
+    121                          // Return 0 if end reached
+    122                          return 0;
+    123                      }
+    124                      if (count == instance)
+    125                      {
+    126                          return (pPDTAG[count] | pPDTAG[count+1]<<8);
+    127                      }
+    128                  }   // for count
+    129              }   // pPDTAG != 0
+    130          
+    131              // Return 0: not found
+    132              return 0;
+    133          }
+    134          
+    135          uint16_t TLV_getPeripheral(uint8_t tag,
+    136                  uint8_t instance
+    137                  )
+    138          {
+    139              uint8_t *pPDTAG;
+    140              uint8_t bPDTAG_bytes;
+    141              uint16_t count = 0;
+    142              uint16_t pcount = 0;
+    143          
+    144              // Get Peripheral data pointer
+    145              TLV_getInfo(TLV_PDTAG,
+    146                      0,
+    147                      &bPDTAG_bytes,
+    148                      (uint16_t **)&pPDTAG
+    149                      );
+    150              if (pPDTAG != 0)
+    151              {
+    152                  // read memory configuration from TLV to get offset for Peripherals
+    153                  while (TLV_getMemory(count))
+    154                  {
+    155                      count++;
+    156                  }
+    157                  // get number of Peripheral entries
+    158                  pcount = pPDTAG[count * 2 + 1];
+    159                  // inc count to first Periperal
+    160                  count++;
+    161                  // adjust point to first address of Peripheral
+    162                  pPDTAG += count*2;
+    163                  // set counter back to 0
+    164                  count = 0;
+    165                  // align pcount for work comparision
+    166                  pcount *= 2;
+    167          
+    168                  // TLV access Function Call
+    169                  for (count = 0; count <= pcount; count += 2)
+    170                  {
+    171                      if (pPDTAG[count+1] == tag)
+    172                      {
+    173                          // test if required Peripheral is found
+    174                          if (instance > 0)
+    175                          {
+    176                              // test if required instance is found
+    177                              instance--;
+    178                          }
+    179                          else
+    180                          {
+    181                              // Return found data
+    182                              return (pPDTAG[count] | pPDTAG[count + 1] << 8);
+    183                          }
+    184                      }   // pPDTAG[count+1] == tag
+    185                  }   // for count
+    186              }   // pPDTAG != 0
+    187          
+    188              // Return 0: not found
+    189              return 0;
+    190          }
+    191          
+    192          uint8_t TLV_getInterrupt(uint8_t tag)
+    193          {
+    194              uint8_t *pPDTAG;
+    195              uint8_t bPDTAG_bytes;
+    196              uint16_t count = 0;
+    197              uint16_t pcount = 0;
+    198          
+    199              // Get Peripheral data pointer
+    200              TLV_getInfo(TLV_PDTAG,
+    201                      0,
+    202                      &bPDTAG_bytes,
+    203                      (uint16_t **)&pPDTAG
+    204                      );
+    205              if (pPDTAG != 0)
+    206              {
+    207                  // read memory configuration from TLV to get offset for Peripherals
+    208                  while (TLV_getMemory(count))
+    209                  {
+    210                      count++;
+    211                  }
+    212          
+    213                  pcount = pPDTAG[count * 2 + 1];
+    214                  // inc count to first Periperal
+    215                  count++;
+    216                  // adjust point to first address of Peripheral
+    217                  pPDTAG += (pcount + count) * 2;
+    218                  // set counter back to 0
+    219                  count = 0;
+    220          
+    221                  // TLV access Function Call
+    222                  for (count = 0; count <= tag; count += 2)
+    223                  {
+    224                      if (pPDTAG[count] == 0)
+    225                      {
+    226                          // Return 0: not found/end of table
+    227                          return 0;
+    228                      }
+    229                      if (count == tag)
+    230                      {
+    231                          // Return found data
+    232                          return (pPDTAG[count]);
+    233                      }
+    234                  }   // for count
+    235              }   // pPDTAG != 0
+    236          
+    237              // Return 0: not found
+    238              return 0;
+    239          }
+    240          
+    241          #endif
+    242          //*****************************************************************************
+    243          //
+    244          //! Close the doxygen group for tlv_api
+    245          //! @}
+    246          //
+    247          //*****************************************************************************
+
+   Maximum stack usage in bytes:
+
+   CSTACK Function
+   ------ --------
+      4   TLV_getDeviceType
+      8   TLV_getInfo
+     18   TLV_getInterrupt
+       16   -> TLV_getInfo
+       16   -> TLV_getMemory
+     10   TLV_getMemory
+       10   -> TLV_getInfo
+     18   TLV_getPeripheral
+       16   -> TLV_getInfo
+       16   -> TLV_getMemory
+
+
+   Segment part sizes:
+
+   Bytes  Function/Label
+   -----  --------------
+       8  TLV_getDeviceType
+      80  TLV_getInfo
+     128  TLV_getInterrupt
+     100  TLV_getMemory
+     144  TLV_getPeripheral
+
+ 
+ 460 bytes in segment CODE
+ 
+ 460 bytes of CODE memory
+
+Errors: none
+Warnings: none

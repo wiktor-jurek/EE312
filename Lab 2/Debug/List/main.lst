@@ -1,0 +1,125 @@
+###############################################################################
+#
+# IAR C/C++ Compiler V7.12.3.989/W32 for MSP430           05/Dec/2019  14:55:07
+# Copyright 1996-2019 IAR Systems AB.
+# PC-locked license - IAR Embedded Workbench for Texas Instruments MSP430, 8K KickStart Edition 7.12
+#
+#    __rt_version  =  3
+#    __double_size =  32
+#    __reg_r4      =  free
+#    __reg_r5      =  free
+#    __pic         =  no
+#    __core        =  430X
+#    __data_model  =  small
+#    __code_model  =  large
+#    Source file   =  C:\Users\Wiktor\Documents\EE312\Lab 2\main.c
+#    Command line  =  
+#        -f C:\Users\Wiktor\AppData\Local\Temp\EW56F8.tmp
+#        ("C:\Users\Wiktor\Documents\EE312\Lab 2\main.c" -lcN
+#        "C:\Users\Wiktor\Documents\EE312\Lab 2\Debug\List" -o
+#        "C:\Users\Wiktor\Documents\EE312\Lab 2\Debug\Obj" --no_cse --no_unroll
+#        --no_inline --no_code_motion --no_tbaa --debug -D__MSP430FR4133__ -e
+#        --double=32 --dlib_config "C:\Program Files (x86)\IAR Systems\Embedded
+#        Workbench 8.0\430\lib\dlib\dl430xlsfn.h" -I
+#        "C:\Users\Wiktor\Documents\EE312\Lab 2\..\" -I
+#        "C:\Users\Wiktor\Documents\EE312\Lab 2\..\driverlib\MSP430FR2xx_4xx\"
+#        --core=430X --data_model=small -Ol --hw_workaround=CPU40
+#        --code_model=large)
+#    Locale        =  English_GBR.1252
+#    List file     =  C:\Users\Wiktor\Documents\EE312\Lab 2\Debug\List\main.lst
+#    Object file   =  C:\Users\Wiktor\Documents\EE312\Lab 2\Debug\Obj\main.r43
+#
+###############################################################################
+
+C:\Users\Wiktor\Documents\EE312\Lab 2\main.c
+      1          /*
+      2           * EE312 Lab 2 Main File
+      3           * Wiktor Jurek 05/12/2019
+      4           * A program that lights the LED's on the MSP430 board in a circle,
+      5           * Button 1 changes the direction of the rotation.
+      6           */
+      7          #include "main.h"
+      8          
+      9          int main(void) {
+     10            // Default MCLK = 1MHz
+     11            unsigned char dialValue = 0;  // Counter for enabling specific leds. 
+     12            WDTCTL = WDTPW | WDTHOLD;     // Stop watchdog timer
+     13            bool isClockWise = true;      // Rotation operator
+     14            initialiseLedDial();          // Initialising GPIO for LED's
+     15            initialiseSwitch();           // Initialising GPIO for switch
+     16            PMM_unlockLPM5();             // Disable the GPIO power-on default high-impedance mode 
+     17                                          // to activate previously configured port settings
+     18          
+     19            while (1) {                   // Main Loop
+     20              isClockWise = checkChange(isClockWise); // Check for a button press
+     21              if (isClockWise) {
+     22                dialValue = dialValue + 1;
+     23                if (9 == dialValue)
+     24                  dialValue = 0;
+     25              } else {
+     26                dialValue = dialValue - 1;
+     27                if (0 == dialValue)
+     28                  dialValue = 9;
+     29              }
+     30              
+     31              setLedDial(dialValue);
+     32              for (int i = 0; i < 10; i++)// Refresh display (10 times for each position)
+     33                refreshLedDial();         // Ensures each led is refreshed i times.
+     34            }
+     35          }
+     36          /*
+     37           * Function:  checkChange
+     38           * --------------------
+     39           * Changes direction if button has been pressed with debouncing
+     40           *
+     41           *  isClokwise: A boolean operator that determines rotation direction
+     42           *
+     43           *  returns: The direction of the rotation after a button press 
+     44           *  (or not press, in which it stays the same)
+     45           */
+     46          bool checkChange(bool isClockWise) {
+     47            int pinState = GPIO_getInputPinValue(GPIO_PORT_P1, GPIO_PIN3);
+     48            if (pinState == 0) {
+     49              __delay_cycles(1000);       // Debouncing
+     50              if (pinState == 0) {
+     51                return !isClockWise;
+     52              } else {
+     53                return isClockWise;
+     54              }
+     55            } else {
+     56              return isClockWise;
+     57            }
+     58          }
+
+   Maximum stack usage in bytes:
+
+   CSTACK Function
+   ------ --------
+      6   checkChange
+        6   -> GPIO_getInputPinValue
+      4   main
+        4   -> PMM_unlockLPM5
+        4   -> checkChange
+        4   -> initialiseLedDial
+        4   -> initialiseSwitch
+        4   -> refreshLedDial
+        4   -> setLedDial
+
+
+   Segment part sizes:
+
+   Bytes  Function/Label
+   -----  --------------
+       2  _A_WDTCTL_L
+      48  checkChange
+      80  main
+
+ 
+ 128 bytes in segment CODE
+   2 bytes in segment DATA16_AN
+ 
+ 128 bytes of CODE memory
+   0 bytes of DATA memory (+ 2 bytes shared)
+
+Errors: none
+Warnings: none

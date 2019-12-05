@@ -1,0 +1,311 @@
+###############################################################################
+#
+# IAR C/C++ Compiler V7.12.3.989/W32 for MSP430           14/Nov/2019  10:44:43
+# Copyright 1996-2019 IAR Systems AB.
+# PC-locked license - IAR Embedded Workbench for Texas Instruments MSP430, 8K KickStart Edition 7.12
+#
+#    __rt_version  =  3
+#    __double_size =  32
+#    __reg_r4      =  free
+#    __reg_r5      =  free
+#    __pic         =  no
+#    __core        =  430X
+#    __data_model  =  small
+#    __code_model  =  large
+#    Source file   =  H:\Year 3\EE312\driverlib\MSP430FR2xx_4xx\framctl.c
+#    Command line  =  
+#        -f C:\Users\rjb17150\AppData\Local\Temp\EWCD17.tmp ("H:\Year
+#        3\EE312\driverlib\MSP430FR2xx_4xx\framctl.c" -lcN "H:\Year 3\EE312\Lab
+#        2\Debug\List" -o "H:\Year 3\EE312\Lab 2\Debug\Obj" --no_cse
+#        --no_unroll --no_inline --no_code_motion --no_tbaa --debug
+#        -D__MSP430FR4133__ -e --double=32 --dlib_config "C:\Program Files
+#        (x86)\IAR Systems\Embedded Workbench 8.0\430\lib\dlib\dl430xlsfn.h" -I
+#        "H:\Year 3\EE312\Lab 2\..\" -I "H:\Year 3\EE312\Lab
+#        2\..\driverlib\MSP430FR2xx_4xx\" --core=430X --data_model=small -Ol
+#        --hw_workaround=CPU40 --code_model=large)
+#    Locale        =  English_GBR.1252
+#    List file     =  H:\Year 3\EE312\Lab 2\Debug\List\framctl.lst
+#    Object file   =  H:\Year 3\EE312\Lab 2\Debug\Obj\framctl.r43
+#
+###############################################################################
+
+H:\Year 3\EE312\driverlib\MSP430FR2xx_4xx\framctl.c
+      1          /* --COPYRIGHT--,BSD
+      2           * Copyright (c) 2017, Texas Instruments Incorporated
+      3           * All rights reserved.
+      4           *
+      5           * Redistribution and use in source and binary forms, with or without
+      6           * modification, are permitted provided that the following conditions
+      7           * are met:
+      8           *
+      9           * *  Redistributions of source code must retain the above copyright
+     10           *    notice, this list of conditions and the following disclaimer.
+     11           *
+     12           * *  Redistributions in binary form must reproduce the above copyright
+     13           *    notice, this list of conditions and the following disclaimer in the
+     14           *    documentation and/or other materials provided with the distribution.
+     15           *
+     16           * *  Neither the name of Texas Instruments Incorporated nor the names of
+     17           *    its contributors may be used to endorse or promote products derived
+     18           *    from this software without specific prior written permission.
+     19           *
+     20           * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+     21           * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+     22           * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+     23           * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+     24           * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+     25           * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+     26           * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+     27           * OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+     28           * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+     29           * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
+     30           * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+     31           * --/COPYRIGHT--*/
+     32          //*****************************************************************************
+     33          //
+     34          // framctl.c - Driver for the framctl Module.
+     35          //
+     36          //*****************************************************************************
+     37          
+     38          //*****************************************************************************
+     39          //
+     40          //! \addtogroup framctl_api framctl
+     41          //! @{
+     42          //
+     43          //*****************************************************************************
+     44          
+     45          #include "inc/hw_memmap.h"
+     46          
+     47          #ifdef __MSP430_HAS_FRAM__
+     48          #include "framctl.h"
+     49          
+     50          #include <assert.h>
+     51          
+     52          void FRAMCtl_write8(uint8_t *dataPtr,
+     53              uint8_t *framPtr,
+     54              uint16_t numberOfBytes
+     55              )
+     56          {
+     57              //Get previous write protection setting
+     58              uint8_t state = HWREG8(SYS_BASE + OFS_SYSCFG0_L);
+     59          #ifdef DFWP
+     60              uint8_t wp = DFWP | PFWP;
+     61          #else
+     62              uint8_t wp = PFWP;
+     63          #endif
+     64          
+     65          #ifdef FRWPPW
+     66              HWREG16(SYS_BASE + OFS_SYSCFG0) = FWPW | (state & ~wp);
+     67          #else
+     68              HWREG8(SYS_BASE + OFS_SYSCFG0_L) &= ~wp;
+     69          #endif
+     70          
+     71              while (numberOfBytes > 0)
+     72              {
+     73                  //Write to Fram
+     74                  *framPtr++ = *dataPtr++;
+     75                  numberOfBytes--;
+     76              }
+     77          
+     78              //Restore previous write protection setting
+     79          #ifdef FRWPPW
+     80              HWREG16(SYS_BASE + OFS_SYSCFG0) = FWPW | state;
+     81          #else
+     82              HWREG8(SYS_BASE + OFS_SYSCFG0_L) = state;
+     83          #endif
+     84          }
+     85          
+     86          void FRAMCtl_write16(uint16_t *dataPtr,uint16_t *framPtr,
+     87          		uint16_t numberOfWords)
+     88          {
+     89              //Get previous write protection setting
+     90              uint8_t state = HWREG8(SYS_BASE + OFS_SYSCFG0_L);
+     91          #ifdef DFWP
+     92              uint8_t wp = DFWP | PFWP;
+     93          #else
+     94              uint8_t wp = PFWP;
+     95          #endif
+     96          
+     97          #ifdef FRWPPW
+     98              HWREG16(SYS_BASE + OFS_SYSCFG0) = FWPW | (state & ~wp);
+     99          #else
+    100              HWREG8(SYS_BASE + OFS_SYSCFG0_L) &= ~wp;
+    101          #endif
+    102          
+    103              while (numberOfWords > 0)
+    104              {
+    105                  //Write to Fram
+    106                  *framPtr++ = *dataPtr++;
+    107                  numberOfWords--;
+    108              }
+    109          
+    110              //Restore previous write protection setting
+    111          #ifdef FRWPPW
+    112              HWREG16(SYS_BASE + OFS_SYSCFG0) = FWPW | state;
+    113          #else
+    114              HWREG8(SYS_BASE + OFS_SYSCFG0_L) = state;
+    115          #endif
+    116          }
+    117          
+    118          void FRAMCtl_write32(uint32_t *dataPtr,uint32_t *framPtr,
+    119          		uint16_t count)
+    120          {
+    121              //Get previous write protection setting
+    122              uint8_t state = HWREG8(SYS_BASE + OFS_SYSCFG0_L);
+    123          #ifdef DFWP
+    124              uint8_t wp = DFWP | PFWP;
+    125          #else
+    126              uint8_t wp = PFWP;
+    127          #endif
+    128          
+    129          #ifdef FRWPPW
+    130              HWREG16(SYS_BASE + OFS_SYSCFG0) = FWPW | (state & ~wp);
+    131          #else
+    132              HWREG8(SYS_BASE + OFS_SYSCFG0_L) &= ~wp;
+    133          #endif
+    134          
+    135              while (count > 0)
+    136              {
+    137                  //Write to Fram
+    138                  *framPtr++ = *dataPtr++;
+    139                  count--;
+    140              }
+    141          
+    142              //Restore previous write protection setting
+    143          #ifdef FRWPPW
+    144              HWREG16(SYS_BASE + OFS_SYSCFG0) = FWPW | state;
+    145          #else
+    146              HWREG8(SYS_BASE + OFS_SYSCFG0_L) = state;
+    147          #endif
+    148          }
+    149          
+    150          void FRAMCtl_fillMemory32 (uint32_t value,
+    151              uint32_t *framPtr,
+    152              uint16_t count
+    153              )
+    154          {
+    155              //Get previous write protection setting
+    156              uint8_t state = HWREG8(SYS_BASE + OFS_SYSCFG0_L);
+    157          #ifdef DFWP
+    158              uint8_t wp = DFWP | PFWP;
+    159          #else
+    160              uint8_t wp = PFWP;
+    161          #endif
+    162          
+    163          #ifdef FRWPPW
+    164              HWREG16(SYS_BASE + OFS_SYSCFG0) = FWPW | (state & ~wp);
+    165          #else
+    166              HWREG8(SYS_BASE + OFS_SYSCFG0_L) &= ~wp;
+    167          #endif
+    168          
+    169              while (count> 0)
+    170              {
+    171                  //Write to Fram
+    172                  *framPtr++ = value;
+    173                  count--;
+    174              }
+    175              
+    176              //Restore previous write protection setting
+    177          #ifdef FRWPPW
+    178              HWREG16(SYS_BASE + OFS_SYSCFG0) = FWPW | state;
+    179          #else
+    180              HWREG8(SYS_BASE + OFS_SYSCFG0_L) = state;
+    181          #endif
+    182          }
+    183          
+    184          void FRAMCtl_enableInterrupt (uint16_t interruptMask)
+    185          {
+    186              uint8_t waitSelection;
+    187          
+    188              waitSelection=(HWREG8(FRAM_BASE + OFS_FRCTL0) & 0xFF);
+    189              // Clear lock in FRAM control registers
+    190              HWREG16(FRAM_BASE + OFS_FRCTL0) = FWPW | waitSelection;
+    191          
+    192              // Enable user selected interrupt sources
+    193              HWREG16(FRAM_BASE + OFS_GCCTL0) |= interruptMask;
+    194          }
+    195          
+    196          uint8_t FRAMCtl_getInterruptStatus(uint16_t interruptFlagMask)
+    197          {
+    198          	return ( HWREG16(FRAM_BASE + OFS_GCCTL1) & interruptFlagMask );
+    199          }
+    200          
+    201          void FRAMCtl_disableInterrupt(uint16_t interruptMask)
+    202          {
+    203          	uint8_t waitSelection;
+    204          
+    205          	waitSelection=(HWREG8(FRAM_BASE + OFS_FRCTL0) & 0xFF);
+    206          	//Clear lock in FRAM control registers
+    207          	HWREG16(FRAM_BASE + OFS_FRCTL0) = FWPW | waitSelection;
+    208          
+    209              HWREG16(FRAM_BASE + OFS_GCCTL0) &= ~(interruptMask);
+    210          }
+    211          
+    212          void FRAMCtl_configureWaitStateControl(uint8_t waitState )
+    213          {    
+    214          	uint8_t tempVariable = HWREG8(FRAM_BASE + OFS_FRCTL0_L);
+    215          	tempVariable &= ~NWAITS_7;
+    216          	tempVariable |= waitState;
+    217          	HWREG16(FRAM_BASE + OFS_FRCTL0) = ( FWPW | tempVariable );
+    218          }
+    219          
+    220          void FRAMCtl_delayPowerUpFromLPM(uint8_t delayStatus)
+    221          {
+    222          #ifdef FRLPMPWR
+    223              uint8_t waitSelection;
+    224          
+    225              waitSelection = (HWREG8(FRAM_BASE + OFS_FRCTL0) & 0xFF);
+    226          
+    227              // Clear lock in FRAM control registers
+    228              HWREG16(FRAM_BASE + OFS_FRCTL0) = FWPW | waitSelection;
+    229          
+    230          	HWREG8(FRAM_BASE + OFS_GCCTL0_L) &= ~FRLPMPWR;
+    231          	HWREG8(FRAM_BASE + OFS_GCCTL0_L) |= delayStatus;
+    232          #endif
+    233          }
+    234          
+    235          
+    236          #endif
+    237          //*****************************************************************************
+    238          //
+    239          //! Close the doxygen group for framctl_api
+    240          //! @}
+    241          //
+    242          //*****************************************************************************
+
+   Maximum stack usage in bytes:
+
+   CSTACK Function
+   ------ --------
+      4   FRAMCtl_configureWaitStateControl
+      4   FRAMCtl_delayPowerUpFromLPM
+      4   FRAMCtl_disableInterrupt
+      4   FRAMCtl_enableInterrupt
+      8   FRAMCtl_fillMemory32
+      4   FRAMCtl_getInterruptStatus
+      6   FRAMCtl_write16
+      6   FRAMCtl_write32
+      6   FRAMCtl_write8
+
+
+   Segment part sizes:
+
+   Bytes  Function/Label
+   -----  --------------
+      22  FRAMCtl_configureWaitStateControl
+      24  FRAMCtl_delayPowerUpFromLPM
+      20  FRAMCtl_disableInterrupt
+      20  FRAMCtl_enableInterrupt
+      40  FRAMCtl_fillMemory32
+      10  FRAMCtl_getInterruptStatus
+      38  FRAMCtl_write16
+      44  FRAMCtl_write32
+      38  FRAMCtl_write8
+
+ 
+ 256 bytes in segment CODE
+ 
+ 256 bytes of CODE memory
+
+Errors: none
+Warnings: none

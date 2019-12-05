@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<workspace>
+    <project>
+        <path>$WS_DIR$\Lab 2\Lab 2.ewp</path>
+    </project>
+    <project>
+        <path>$WS_DIR$\Lab 3\Lab 3.ewp</path>
+    </project>
+    <project>
+        <path>$WS_DIR$\Lab 4\Lab4.ewp</path>
+    </project>
+    <project>
+        <path>$WS_DIR$\Lab 5\Lab5.ewp</path>
+    </project>
+    <project>
+        <path>$WS_DIR$\Template_IAR_Project\TemplateProject.ewp</path>
+    </project>
+    <batchBuild />
+</workspace>
