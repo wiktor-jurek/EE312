@@ -8,7 +8,6 @@ unsigned char ledValue_ = 0;
  * Initialises GPIO for LED's on MSP430 board
  */
 void initialiseLedDial() {
-    //Initialise the LED Outputs
     GPIO_setAsOutputPin(GPIO_PORT_P2, GPIO_PIN7);
     GPIO_setAsOutputPin(GPIO_PORT_P5, GPIO_PIN1);
     GPIO_setAsOutputPin(GPIO_PORT_P5, GPIO_PIN2);
@@ -22,7 +21,6 @@ void initialiseLedDial() {
  * Initialises the interrupt GPIO on the MSP430 boards
  */
 void initialiseInterrupts(){
-    // Configure button S1 interrupt
     GPIO_selectInterruptEdge(GPIO_PORT_P1, GPIO_PIN3, GPIO_LOW_TO_HIGH_TRANSITION);
     GPIO_setAsInputPinWithPullUpResistor(GPIO_PORT_P1, GPIO_PIN3);  
     GPIO_enableInterrupt(GPIO_PORT_P1, GPIO_PIN3);
@@ -34,14 +32,14 @@ void initialiseInterrupts(){
  * Initialises the ADC parameters for optimal usage.
  */
 void initialiseADC(){
-  GPIO_setAsPeripheralModuleFunctionOutputPin(GPIO_PORT_P8, GPIO_PIN1, GPIO_PRIMARY_MODULE_FUNCTION); // 8.1 is our potentiometer
-  SYSCFG2|=ADCPCTL9;            //
-  ADCCTL0|=ADCSHT_2|ADCON;      //
-  ADCCTL1|=ADCSHP;              //
-  ADCCTL2|=ADCRES_1;            //
+  GPIO_setAsPeripheralModuleFunctionOutputPin(GPIO_PORT_P8, GPIO_PIN1, GPIO_PRIMARY_MODULE_FUNCTION); // 8.1 is our potentiometer - ADC Configured.
+  SYSCFG2|=ADCPCTL9;            // 
+  ADCCTL0|=ADCSHT_2|ADCON;      // ADCON - Turns the ADC ON. | ADCSHT_2 - Sets the sampling period to 16 samples 
+  ADCCTL1|=ADCSHP;              // SAMPCON is sourced from the sample timer
+  ADCCTL2|=ADCRES_1;            // Sets the sampling resolution to 10 bits.
   ADCMCTL0|=ADCINCH_9;          //
-  ADC_clearInterrupt(ADC_BASE,ADC_COMPLETED_INTERRUPT);         // Clear interrupt
-  ADC_enableInterrupt(ADC_BASE,ADC_COMPLETED_INTERRUPT);        // Enable interrupt
+  ADC_clearInterrupt(ADC_BASE,ADC_COMPLETED_INTERRUPT);         // Interrupt configuration - Clear interrupt
+  ADC_enableInterrupt(ADC_BASE,ADC_COMPLETED_INTERRUPT);        // Interrupt configuration - Enable interrupt
 }
 
 /*
